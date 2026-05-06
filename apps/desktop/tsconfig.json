@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vitest", "@testing-library/jest-dom"],
+    "outDir": "dist"
+  },
+  "include": ["src", "electron.vite.config.ts"]
+}
