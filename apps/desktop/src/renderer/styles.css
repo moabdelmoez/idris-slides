@@ -29,6 +29,14 @@ input {
   background: #ffffff;
 }
 
+.topBarActions,
+.chatHeader,
+.modalActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .topBar h1,
 .sidebar h2,
 .previewHeader h2,
@@ -83,10 +91,112 @@ input {
 }
 
 .emptyState,
-.chatBody {
+.emptyChat {
   color: #6b767c;
   font-size: 14px;
   margin-top: 18px;
+}
+
+.projectList {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.projectItem {
+  width: 100%;
+  border: 1px solid #d8dee2;
+  background: #ffffff;
+  color: #1d252d;
+  padding: 10px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+}
+
+.projectItem.active {
+  border-color: #4f008c;
+  box-shadow: inset 3px 0 0 #4f008c;
+}
+
+.projectName {
+  font-weight: 700;
+}
+
+.projectItem span:last-child {
+  color: #6b767c;
+  font-size: 12px;
+}
+
+.chatBody {
+  min-height: 0;
+  overflow: auto;
+}
+
+.statusReady,
+.statusMissing {
+  font-size: 12px;
+}
+
+.statusReady {
+  color: #007f5f;
+}
+
+.statusMissing,
+.errorText {
+  color: #b42318;
+}
+
+.chatMessage {
+  border-top: 1px solid #e3e8eb;
+  padding: 12px 0;
+}
+
+.chatMessage p {
+  margin: 0 0 8px;
+}
+
+.chatMessage.user p {
+  color: #1d252d;
+  font-weight: 600;
+}
+
+.chatMessage.system p {
+  color: #b42318;
+}
+
+.outlineCard {
+  border: 1px solid #d8dee2;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.outlineCard h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.outlineCard ol {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+.outlineCard li {
+  margin: 8px 0;
+}
+
+.outlineCard span {
+  display: block;
+  color: #6b767c;
+  margin-top: 3px;
+}
+
+.approveOutlineButton {
+  margin-top: 12px;
+  background: #4f008c;
+  border: 1px solid #4f008c;
+  color: #ffffff;
+  padding: 7px 10px;
 }
 
 .previewPane {
@@ -115,7 +225,96 @@ input {
   box-shadow: 0 16px 50px rgb(29 37 45 / 12%);
 }
 
+.activeSlideCanvas {
+  place-items: stretch;
+  padding: 52px;
+  box-sizing: border-box;
+  align-content: space-between;
+  background: #4f008c;
+  color: #ffffff;
+}
+
+.activeSlideCanvas h3 {
+  margin: 0;
+  font-size: 52px;
+  line-height: 1.02;
+}
+
+.activeSlideCanvas p {
+  margin: 18px 0 0;
+  max-width: 640px;
+  font-size: 21px;
+  line-height: 1.32;
+}
+
+.slideEyebrow {
+  color: #ffdd40;
+  font-size: 15px;
+}
+
+.slideAccentBar {
+  display: flex;
+  gap: 10px;
+}
+
+.slideAccentBar span {
+  width: 58px;
+  height: 10px;
+  display: block;
+}
+
+.slideAccentBar span:nth-child(1) {
+  background: #ff375e;
+}
+
+.slideAccentBar span:nth-child(2) {
+  background: #ffdd40;
+}
+
+.slideAccentBar span:nth-child(3) {
+  background: #00c48c;
+}
+
+.slideAccentBar span:nth-child(4) {
+  background: #1bcad8;
+}
+
 .chatInput input {
   min-width: 0;
   flex: 1;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(29 37 45 / 20%);
+}
+
+.settingsModal {
+  width: min(420px, calc(100vw - 32px));
+  background: #ffffff;
+  border: 1px solid #d8dee2;
+  padding: 20px;
+}
+
+.settingsModal h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+.settingsModal label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.settingsModal input {
+  min-width: 0;
+}
+
+.modalActions {
+  justify-content: flex-end;
+  margin-top: 16px;
 }
