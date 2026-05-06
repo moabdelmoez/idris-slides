@@ -3,11 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "packageManager": "pnpm@10.17.0",
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": "24.15.0",
+    "npm": "11.12.1"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "pnpm --filter @idris-slides/desktop dev",
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "dev": "npm run dev --workspace @idris-slides/desktop",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest"
   },

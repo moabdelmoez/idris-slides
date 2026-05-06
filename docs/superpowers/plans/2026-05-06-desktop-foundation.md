@@ -4,9 +4,9 @@
 
 **Goal:** Build the first working slice of the Idris Slides desktop app: Electron shell, Solutions brand package, local project metadata, and open-slide preview/export orchestration.
 
-**Architecture:** Use a pnpm monorepo with focused packages for desktop UI, brand tokens, and project orchestration. Electron owns file system, child process, and IPC boundaries; React renders the workspace UI; `@open-slide/core` remains the slide runtime for generated decks.
+**Architecture:** Use a npm workspace monorepo with focused packages for desktop UI, brand tokens, and project orchestration. Electron owns file system, child process, and IPC boundaries; React renders the workspace UI; `@open-slide/core` remains the slide runtime for generated decks.
 
-**Tech Stack:** pnpm workspaces, TypeScript, Electron, React, Vite, Vitest, Testing Library, `@open-slide/core`, `lucide-react`.
+**Tech Stack:** npm workspaces, TypeScript, Electron, React, Vite, Vitest, Testing Library, `@open-slide/core`, `lucide-react`.
 
 ---
 
@@ -25,7 +25,7 @@ This slice produces working, testable software:
 ## File Structure
 
 - `package.json`: root scripts and workspace metadata.
-- `pnpm-workspace.yaml`: workspace package discovery.
+- `package.json`: workspace package discovery through the `workspaces` field.
 - `tsconfig.base.json`: shared TypeScript settings.
 - `vitest.config.ts`: root test discovery.
 - `.gitignore`: Node, Electron, build, and local app data ignores.
@@ -59,7 +59,6 @@ This slice produces working, testable software:
 
 **Files:**
 - Create: `package.json`
-- Create: `pnpm-workspace.yaml`
 - Create: `tsconfig.base.json`
 - Create: `vitest.config.ts`
 - Create: `.gitignore`
@@ -75,32 +74,31 @@ Create `package.json`:
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "packageManager": "pnpm@10.17.0",
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": "24.15.0",
+    "npm": "11.12.1"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "pnpm --filter @idris-slides/desktop dev",
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "dev": "npm run dev --workspace @idris-slides/desktop",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.0"
   }
 }
 ```
 
-- [ ] **Step 2: Add workspace discovery**
-
-Create `pnpm-workspace.yaml`:
-
-```yaml
-packages:
-  - "apps/*"
-  - "packages/*"
-```
-
-- [ ] **Step 3: Add shared TypeScript config**
+- [ ] **Step 2: Add shared TypeScript config**
 
 Create `tsconfig.base.json`:
 
@@ -122,7 +120,7 @@ Create `tsconfig.base.json`:
 }
 ```
 
-- [ ] **Step 4: Add Vitest config**
+- [ ] **Step 3: Add Vitest config**
 
 Create `vitest.config.ts`:
 
@@ -133,12 +131,13 @@ export default defineConfig({
   test: {
     globals: false,
     environment: "node",
+    passWithNoTests: true,
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "apps/**/*.test.tsx"]
   }
 });
 ```
 
-- [ ] **Step 5: Add ignores**
+- [ ] **Step 4: Add ignores**
 
 Create `.gitignore`:
 
@@ -153,7 +152,7 @@ coverage/
 local-projects/
 ```
 
-- [ ] **Step 6: Expand README**
+- [ ] **Step 5: Expand README**
 
 Replace `README.md` with:
 
@@ -165,37 +164,37 @@ Desktop app for creating Solutions-branded `open-slide` decks with AI-assisted a
 ## Development
 
 ```bash
-pnpm install
-pnpm dev
-pnpm test
-pnpm typecheck
+npm install
+npm run dev
+npm test
+npm run typecheck
 ```
 ```
 
-- [ ] **Step 7: Install dependencies**
+- [ ] **Step 6: Install project dependencies**
 
 Run:
 
 ```bash
-pnpm install
+npm install
 ```
 
-Expected: `pnpm-lock.yaml` is created and install exits with code 0.
+Expected: `package-lock.json` is created and install exits with code 0.
 
-- [ ] **Step 8: Verify empty test command works**
+- [ ] **Step 7: Verify empty test command works**
 
 Run:
 
 ```bash
-pnpm test -- --passWithNoTests
+npm test -- --passWithNoTests
 ```
 
 Expected: Vitest exits successfully with no test failures.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add package.json pnpm-workspace.yaml tsconfig.base.json vitest.config.ts .gitignore README.md pnpm-lock.yaml
+git add package.json tsconfig.base.json vitest.config.ts .gitignore README.md package-lock.json
 git commit -m "chore: set up workspace tooling"
 ```
 
@@ -321,7 +320,7 @@ describe("brand color validation", () => {
 Run:
 
 ```bash
-pnpm test packages/brand/src/validate.test.ts
+npm test packages/brand/src/validate.test.ts
 ```
 
 Expected: FAIL because `./validate` does not exist.
@@ -458,8 +457,8 @@ Expected: the three `.ttf` files exist in `packages/brand/src/fonts/`.
 Run:
 
 ```bash
-pnpm test packages/brand/src/validate.test.ts
-pnpm --filter @idris-slides/brand typecheck
+npm test packages/brand/src/validate.test.ts
+npm run typecheck --workspace @idris-slides/brand
 ```
 
 Expected: both commands pass.
@@ -467,7 +466,7 @@ Expected: both commands pass.
 - [ ] **Step 11: Commit**
 
 ```bash
-git add packages/brand package.json pnpm-lock.yaml
+git add packages/brand package.json package-lock.json
 git commit -m "feat: add Solutions brand package"
 ```
 
@@ -592,7 +591,7 @@ describe("project store", () => {
 Run:
 
 ```bash
-pnpm test packages/project/src/store.test.ts
+npm test packages/project/src/store.test.ts
 ```
 
 Expected: FAIL because `./store` does not exist.
@@ -700,8 +699,8 @@ export * from "./types";
 Run:
 
 ```bash
-pnpm test packages/project/src/store.test.ts
-pnpm --filter @idris-slides/project typecheck
+npm test packages/project/src/store.test.ts
+npm run typecheck --workspace @idris-slides/project
 ```
 
 Expected: both commands pass.
@@ -709,7 +708,7 @@ Expected: both commands pass.
 - [ ] **Step 10: Commit**
 
 ```bash
-git add packages/project package.json pnpm-lock.yaml
+git add packages/project package.json package-lock.json
 git commit -m "feat: add local project store"
 ```
 
@@ -764,8 +763,8 @@ describe("open-slide orchestration", () => {
 
     expect(runner.calls).toEqual([
       {
-        command: "pnpm",
-        args: ["open-slide", "export", "pdf", "--out", "/tmp/out/deck.pdf"],
+        command: "npm",
+        args: ["exec", "--", "open-slide", "export", "pdf", "--out", "/tmp/out/deck.pdf"],
         cwd: "/tmp/project/deck"
       }
     ]);
@@ -778,8 +777,8 @@ describe("open-slide orchestration", () => {
 
     expect(runner.calls).toEqual([
       {
-        command: "pnpm",
-        args: ["open-slide", "export", "html", "--out", "/tmp/out/site"],
+        command: "npm",
+        args: ["exec", "--", "open-slide", "export", "html", "--out", "/tmp/out/site"],
         cwd: "/tmp/project/deck"
       }
     ]);
@@ -792,7 +791,7 @@ describe("open-slide orchestration", () => {
 Run:
 
 ```bash
-pnpm test packages/project/src/openSlide.test.ts
+npm test packages/project/src/openSlide.test.ts
 ```
 
 Expected: FAIL because `./openSlide` does not exist.
@@ -812,16 +811,16 @@ type ExportInput = {
 
 export async function exportDeckToPdf(input: ExportInput): Promise<void> {
   await input.runner.run(
-    "pnpm",
-    ["open-slide", "export", "pdf", "--out", input.outputPath],
+    "npm",
+    ["exec", "--", "open-slide", "export", "pdf", "--out", input.outputPath],
     { cwd: input.deckPath }
   );
 }
 
 export async function exportDeckToHtml(input: ExportInput): Promise<void> {
   await input.runner.run(
-    "pnpm",
-    ["open-slide", "export", "html", "--out", input.outputPath],
+    "npm",
+    ["exec", "--", "open-slide", "export", "html", "--out", input.outputPath],
     { cwd: input.deckPath }
   );
 }
@@ -840,8 +839,8 @@ export * from "./openSlide";
 Run:
 
 ```bash
-pnpm test packages/project/src/openSlide.test.ts packages/project/src/store.test.ts
-pnpm --filter @idris-slides/project typecheck
+npm test packages/project/src/openSlide.test.ts packages/project/src/store.test.ts
+npm run typecheck --workspace @idris-slides/project
 ```
 
 Expected: both commands pass.
@@ -891,8 +890,8 @@ Create `apps/desktop/package.json`:
     "test": "vitest run src"
   },
   "dependencies": {
-    "@idris-slides/brand": "workspace:*",
-    "@idris-slides/project": "workspace:*",
+    "@idris-slides/brand": "file:../../packages/brand",
+    "@idris-slides/project": "file:../../packages/project",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -1128,7 +1127,7 @@ describe("App", () => {
 Run:
 
 ```bash
-pnpm test apps/desktop/src/renderer/App.test.tsx
+npm test apps/desktop/src/renderer/App.test.tsx
 ```
 
 Expected: FAIL because `./App` does not exist.
@@ -1379,8 +1378,8 @@ input {
 Run:
 
 ```bash
-pnpm test apps/desktop/src/renderer/App.test.tsx
-pnpm --filter @idris-slides/desktop typecheck
+npm test apps/desktop/src/renderer/App.test.tsx
+npm run typecheck --workspace @idris-slides/desktop
 ```
 
 Expected: both commands pass.
@@ -1388,7 +1387,7 @@ Expected: both commands pass.
 - [ ] **Step 14: Commit**
 
 ```bash
-git add apps/desktop package.json pnpm-lock.yaml
+git add apps/desktop package.json package-lock.json
 git commit -m "feat: add desktop workspace shell"
 ```
 
@@ -1402,7 +1401,7 @@ git commit -m "feat: add desktop workspace shell"
 Run:
 
 ```bash
-pnpm test
+npm test
 ```
 
 Expected: all tests pass.
@@ -1412,7 +1411,7 @@ Expected: all tests pass.
 Run:
 
 ```bash
-pnpm typecheck
+npm run typecheck
 ```
 
 Expected: all package typechecks pass.
@@ -1422,7 +1421,7 @@ Expected: all package typechecks pass.
 Run:
 
 ```bash
-pnpm build
+npm run build
 ```
 
 Expected: all packages build or typecheck successfully. If Electron main/preload output configuration needs adjustment, fix the package scripts and rerun this command before continuing.

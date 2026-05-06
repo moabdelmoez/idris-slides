@@ -5,8 +5,8 @@ Desktop app for creating Solutions-branded `open-slide` decks with AI-assisted a
 ## Development
 
 ```bash
-pnpm install
-pnpm dev
-pnpm test
-pnpm typecheck
+npm install
+npm run dev
+npm test
+npm run typecheck
 ```
