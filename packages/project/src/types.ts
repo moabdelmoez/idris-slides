@@ -20,3 +20,13 @@ export type CreateProjectInput = {
   name: string;
   workspaceRoot: string;
 };
+
+export type CommandRunner = {
+  run(command: string, args: string[], options: { cwd: string }): Promise<void>;
+};
+
+export type PreviewSession = {
+  projectId: ProjectId;
+  url: string;
+  stop(): Promise<void>;
+};
