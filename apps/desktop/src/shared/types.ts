@@ -21,3 +21,8 @@ export type ChatMessage = {
   content: string;
   outline?: DeckOutline;
 };
+
+export type PreviewSessionInfo = {
+  projectId: string;
+  url: string;
+};

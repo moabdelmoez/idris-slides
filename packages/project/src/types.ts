@@ -8,8 +8,10 @@ export type ProjectMetadata = {
   deckPath: string;
   exports: ProjectExport[];
   sourcePrompt?: string;
+  lastEditPrompt?: string;
   outline?: DeckOutline;
   slideCount?: number;
+  slideDirName?: string;
 };
 
 export type ProjectExport = {
@@ -41,6 +43,12 @@ export type CreateProjectFromOutlineInput = {
   workspaceRoot: string;
   prompt: string;
   outline: DeckOutline;
+};
+
+export type ApplyDeckOutlineInput = {
+  project: ProjectMetadata;
+  outline: DeckOutline;
+  editPrompt: string;
 };
 
 export type CommandRunner = {

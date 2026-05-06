@@ -1,10 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ProjectMetadata } from "@idris-slides/project";
-import type { AppSettings, DeckOutline } from "../shared/types";
+import type { AppSettings, DeckOutline, PreviewSessionInfo } from "../shared/types";
 
 export type IdrisSlidesApi = {
   createProject(name: string): Promise<ProjectMetadata>;
   createDeckFromOutline(prompt: string, outline: DeckOutline): Promise<ProjectMetadata>;
+  editDeck(project: ProjectMetadata, prompt: string): Promise<ProjectMetadata>;
+  startPreview(project: ProjectMetadata): Promise<PreviewSessionInfo>;
+  exportProject(project: ProjectMetadata, kind: "pdf" | "html"): Promise<ProjectMetadata>;
   getSettings(): Promise<AppSettings>;
   saveGeminiApiKey(apiKey: string): Promise<AppSettings>;
   generateOutline(prompt: string): Promise<DeckOutline>;
@@ -16,6 +19,15 @@ const api: IdrisSlidesApi = {
   },
   createDeckFromOutline(prompt, outline) {
     return ipcRenderer.invoke("projects:createDeckFromOutline", prompt, outline) as Promise<ProjectMetadata>;
+  },
+  editDeck(project, prompt) {
+    return ipcRenderer.invoke("projects:editDeck", project, prompt) as Promise<ProjectMetadata>;
+  },
+  startPreview(project) {
+    return ipcRenderer.invoke("projects:startPreview", project) as Promise<PreviewSessionInfo>;
+  },
+  exportProject(project, kind) {
+    return ipcRenderer.invoke("projects:export", project, kind) as Promise<ProjectMetadata>;
   },
   getSettings() {
     return ipcRenderer.invoke("settings:get") as Promise<AppSettings>;

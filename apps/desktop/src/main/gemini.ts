@@ -1,3 +1,4 @@
+import type { ProjectMetadata } from "@idris-slides/project";
 import type { DeckOutline } from "../shared/types";
 
 type GeminiPart = {
@@ -49,6 +50,27 @@ function buildOutlinePrompt(prompt: string): string {
   ].join("\n");
 }
 
+function buildEditPrompt(project: ProjectMetadata, editPrompt: string): string {
+  return [
+    "Revise an existing Solutions/STC branded open-slide deck outline.",
+    "Return the full updated outline JSON, not a partial patch.",
+    "Preserve approved brand direction and use only approved layouts/colors.",
+    "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
+    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide.",
+    "",
+    `Current project: ${JSON.stringify(
+      {
+        name: project.name,
+        outline: project.outline
+      },
+      null,
+      2
+    )}`,
+    "",
+    `User edit request: ${editPrompt}`
+  ].join("\n");
+}
+
 function parseOutline(text: string): DeckOutline {
   const cleaned = text
     .trim()
@@ -66,6 +88,18 @@ function parseOutline(text: string): DeckOutline {
 }
 
 export async function generateGeminiOutline(apiKey: string, prompt: string): Promise<DeckOutline> {
+  return requestGeminiOutline(apiKey, buildOutlinePrompt(prompt));
+}
+
+export async function generateGeminiEditedOutline(
+  apiKey: string,
+  project: ProjectMetadata,
+  prompt: string
+): Promise<DeckOutline> {
+  return requestGeminiOutline(apiKey, buildEditPrompt(project, prompt));
+}
+
+async function requestGeminiOutline(apiKey: string, prompt: string): Promise<DeckOutline> {
   const response = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
     {
@@ -77,7 +111,7 @@ export async function generateGeminiOutline(apiKey: string, prompt: string): Pro
       body: JSON.stringify({
         contents: [
           {
-            parts: [{ text: buildOutlinePrompt(prompt) }]
+            parts: [{ text: prompt }]
           }
         ],
         generationConfig: {

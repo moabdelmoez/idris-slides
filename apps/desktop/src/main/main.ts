@@ -2,6 +2,7 @@ import { app, BrowserWindow } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerIpcHandlers } from "./ipc";
+import { stopAllPreviews } from "./preview-manager";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -40,4 +41,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  stopAllPreviews();
 });

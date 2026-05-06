@@ -22,8 +22,11 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
   const [activeProject, setActiveProject] = useState<ProjectMetadata | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isDesktopBridgeAvailable = Boolean(window.idrisSlides);
 
@@ -71,22 +74,40 @@ export function App() {
     };
 
     setMessage("");
-    setLastPrompt(trimmed);
     setMessages((current) => [...current, userMessage]);
     setIsGenerating(true);
     setError(null);
 
     try {
-      const outline: DeckOutline = await window.idrisSlides.generateOutline(trimmed);
-      setMessages((current) => [
-        ...current,
-        {
-          id: createMessageId(),
-          role: "assistant",
-          content: "Outline ready for review.",
-          outline
-        }
-      ]);
+      if (activeProject) {
+        const project = await window.idrisSlides.editDeck(activeProject, trimmed);
+        updateActiveProject(project);
+        setMessages((current) => [
+          ...current,
+          {
+            id: createMessageId(),
+            role: "assistant",
+            content: project.outline?.summary ?? "Deck updated and saved locally."
+          },
+          {
+            id: createMessageId(),
+            role: "system",
+            content: "Deck updated and saved locally."
+          }
+        ]);
+      } else {
+        setLastPrompt(trimmed);
+        const outline: DeckOutline = await window.idrisSlides.generateOutline(trimmed);
+        setMessages((current) => [
+          ...current,
+          {
+            id: createMessageId(),
+            role: "assistant",
+            content: "Outline ready for review.",
+            outline
+          }
+        ]);
+      }
     } catch (caught) {
       const detail = caught instanceof Error ? caught.message : "Unable to generate outline.";
       setError(detail);
@@ -103,6 +124,39 @@ export function App() {
     }
   }
 
+  function updateActiveProject(project: ProjectMetadata): void {
+    setActiveProject(project);
+    setProjects((current) => [project, ...current.filter((item) => item.id !== project.id)]);
+  }
+
+  async function startPreview(project: ProjectMetadata): Promise<void> {
+    if (!window.idrisSlides) {
+      setError(bridgeUnavailableMessage);
+      return;
+    }
+
+    setIsPreviewing(true);
+    setError(null);
+
+    try {
+      const session = await window.idrisSlides.startPreview(project);
+      setPreviewUrl(session.url);
+    } catch (caught) {
+      const detail = caught instanceof Error ? caught.message : "Unable to start live preview.";
+      setError(detail);
+      setMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "system",
+          content: detail
+        }
+      ]);
+    } finally {
+      setIsPreviewing(false);
+    }
+  }
+
   async function approveOutline(outline: DeckOutline): Promise<void> {
     if (!window.idrisSlides) {
       setError(bridgeUnavailableMessage);
@@ -114,8 +168,7 @@ export function App() {
 
     try {
       const project = await window.idrisSlides.createDeckFromOutline(lastPrompt, outline);
-      setActiveProject(project);
-      setProjects((current) => [project, ...current.filter((item) => item.id !== project.id)]);
+      updateActiveProject(project);
       setMessages((current) => [
         ...current,
         {
@@ -124,6 +177,7 @@ export function App() {
           content: "Deck created and saved locally."
         }
       ]);
+      await startPreview(project);
     } catch (caught) {
       const detail = caught instanceof Error ? caught.message : "Unable to create deck.";
       setError(detail);
@@ -137,6 +191,41 @@ export function App() {
       ]);
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function exportProject(kind: "pdf" | "html"): Promise<void> {
+    if (!activeProject || !window.idrisSlides) {
+      return;
+    }
+
+    setIsExporting(true);
+    setError(null);
+
+    try {
+      const project = await window.idrisSlides.exportProject(activeProject, kind);
+      updateActiveProject(project);
+      setMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "system",
+          content: `Exported ${kind.toUpperCase()}.`
+        }
+      ]);
+    } catch (caught) {
+      const detail = caught instanceof Error ? caught.message : `Unable to export ${kind}.`;
+      setError(detail);
+      setMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "system",
+          content: detail
+        }
+      ]);
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -154,7 +243,13 @@ export function App() {
       {!isDesktopBridgeAvailable ? <div className="bridgeNotice">{bridgeUnavailableMessage}</div> : null}
       <div className="workspace">
         <ProjectSidebar projects={projects} activeProjectId={activeProject?.id ?? null} />
-        <PreviewPane project={activeProject} />
+        <PreviewPane
+          isExporting={isExporting}
+          isPreviewing={isPreviewing}
+          onExport={(kind) => void exportProject(kind)}
+          previewUrl={previewUrl}
+          project={activeProject}
+        />
         <ChatPanel
           canSend={isDesktopBridgeAvailable && settings.hasGeminiApiKey}
           isGenerating={isGenerating}

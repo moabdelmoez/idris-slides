@@ -24,6 +24,49 @@ describe("App", () => {
         sourcePrompt: "Create a 5 slide deck about market expansion",
         slideCount: 1
       }),
+      editDeck: vi.fn().mockResolvedValue({
+        id: "project-1",
+        name: "Market Expansion",
+        createdAt: "2026-05-06T00:00:00.000Z",
+        updatedAt: "2026-05-06T00:01:00.000Z",
+        deckPath: "/tmp/idris/project-1/deck",
+        exports: [],
+        sourcePrompt: "Create a 5 slide deck about market expansion",
+        slideCount: 1,
+        outline: {
+          title: "Market Expansion",
+          summary: "More executive and metric-led.",
+          slides: [
+            {
+              title: "Executive Opportunity",
+              goal: "Frame the growth opportunity for leaders.",
+              layout: "Metric slide",
+              visualDirection: "Use purple with coral emphasis."
+            }
+          ]
+        }
+      }),
+      startPreview: vi.fn().mockResolvedValue({
+        projectId: "project-1",
+        url: "http://127.0.0.1:5317"
+      }),
+      exportProject: vi.fn().mockResolvedValue({
+        id: "project-1",
+        name: "Market Expansion",
+        createdAt: "2026-05-06T00:00:00.000Z",
+        updatedAt: "2026-05-06T00:02:00.000Z",
+        deckPath: "/tmp/idris/project-1/deck",
+        exports: [
+          {
+            id: "export-1",
+            kind: "html",
+            path: "/tmp/idris/project-1/exports/html",
+            createdAt: "2026-05-06T00:02:00.000Z"
+          }
+        ],
+        sourcePrompt: "Create a 5 slide deck about market expansion",
+        slideCount: 1
+      }),
       getSettings: vi.fn().mockResolvedValue({ hasGeminiApiKey: false }),
       saveGeminiApiKey: vi.fn().mockResolvedValue({ hasGeminiApiKey: true }),
       generateOutline: vi.fn().mockResolvedValue({
@@ -91,11 +134,36 @@ describe("App", () => {
 
     expect(await screen.findByText("Market Expansion", { selector: ".projectName" })).toBeInTheDocument();
     expect(screen.getByText("1 slide generated")).toBeInTheDocument();
-    expect(screen.getByText("Deck created and saved locally.")).toBeInTheDocument();
+    expect(await screen.findByTitle("Live open-slide preview")).toHaveAttribute(
+      "src",
+      "http://127.0.0.1:5317"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Export HTML" }));
+
+    await waitFor(() => {
+      expect(window.idrisSlides?.exportProject).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "project-1" }),
+        "html"
+      );
+    });
+
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Make this more executive" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("More executive and metric-led.")).toBeInTheDocument();
+    expect(screen.getByText("Deck updated and saved locally.")).toBeInTheDocument();
     expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
     expect(window.idrisSlides?.generateOutline).toHaveBeenCalledWith(
       "Create a 5 slide deck about market expansion"
     );
     expect(window.idrisSlides?.createDeckFromOutline).toHaveBeenCalled();
+    expect(window.idrisSlides?.startPreview).toHaveBeenCalledWith(expect.objectContaining({ id: "project-1" }));
+    expect(window.idrisSlides?.editDeck).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "project-1" }),
+      "Make this more executive"
+    );
   });
 });

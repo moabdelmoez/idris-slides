@@ -1,6 +1,12 @@
 import { ipcMain } from "electron";
-import { generateOutline } from "./ai-handlers";
-import { createLocalDeckFromOutline, createLocalProject } from "./project-handlers";
+import { editDeck, generateOutline } from "./ai-handlers";
+import { exportProject } from "./export-handlers";
+import {
+  assertLocalProject,
+  createLocalDeckFromOutline,
+  createLocalProject,
+  startLocalPreview
+} from "./project-handlers";
 import { getSettings, saveGeminiApiKey } from "./settings-handlers";
 
 export function registerIpcHandlers(): void {
@@ -10,6 +16,18 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle("projects:createDeckFromOutline", async (_event, prompt, outline) => {
     return createLocalDeckFromOutline(prompt, outline);
+  });
+
+  ipcMain.handle("projects:editDeck", async (_event, project, prompt: string) => {
+    return editDeck(assertLocalProject(project), prompt);
+  });
+
+  ipcMain.handle("projects:startPreview", async (_event, project) => {
+    return startLocalPreview(project);
+  });
+
+  ipcMain.handle("projects:export", async (_event, project, kind: "pdf" | "html") => {
+    return exportProject(assertLocalProject(project), kind);
   });
 
   ipcMain.handle("settings:get", async () => {

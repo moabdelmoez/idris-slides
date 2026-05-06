@@ -2,7 +2,12 @@ import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createProjectFromOutline, exportDeckToHtml, exportDeckToPdf } from "./openSlide";
+import {
+  createProjectFromOutline,
+  exportDeckToHtml,
+  installDeckDependencies,
+  startDeckPreview
+} from "./openSlide";
 import type { CommandRunner } from "./types";
 
 function createRecordingRunner(): {
@@ -67,27 +72,42 @@ describe("open-slide command orchestration", () => {
     expect(slideFile).toContain("satisfies Page[]");
     expect(project.sourcePrompt).toBe("Create a deck about market expansion");
     expect(project.slideCount).toBe(2);
+    expect(project.slideDirName).toBe("market-expansion");
   });
 
-  it("exports a deck to PDF through npm exec", async () => {
+  it("installs deck dependencies through npm install", async () => {
     const { calls, runner } = createRecordingRunner();
 
-    await exportDeckToPdf({
+    await installDeckDependencies({ deckPath: "/tmp/project/deck", runner });
+
+    expect(calls).toEqual([
+      {
+        command: "npm",
+        args: ["install"],
+        options: { cwd: "/tmp/project/deck" }
+      }
+    ]);
+  });
+
+  it("starts open-slide preview on a chosen localhost port", async () => {
+    const { calls, runner } = createRecordingRunner();
+
+    await startDeckPreview({
       deckPath: "/tmp/project/deck",
-      outputPath: "/tmp/out/deck.pdf",
+      port: 5317,
       runner
     });
 
     expect(calls).toEqual([
       {
         command: "npm",
-        args: ["exec", "--", "open-slide", "export", "pdf", "--out", "/tmp/out/deck.pdf"],
+        args: ["run", "dev", "--", "--port", "5317", "--host", "127.0.0.1", "--no-skills-check"],
         options: { cwd: "/tmp/project/deck" }
       }
     ]);
   });
 
-  it("exports a deck to HTML through npm exec", async () => {
+  it("exports a deck to static HTML through open-slide build", async () => {
     const { calls, runner } = createRecordingRunner();
 
     await exportDeckToHtml({
@@ -99,7 +119,7 @@ describe("open-slide command orchestration", () => {
     expect(calls).toEqual([
       {
         command: "npm",
-        args: ["exec", "--", "open-slide", "export", "html", "--out", "/tmp/out/site"],
+        args: ["run", "build", "--", "--out-dir", "/tmp/out/site"],
         options: { cwd: "/tmp/project/deck" }
       }
     ]);

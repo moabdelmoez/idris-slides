@@ -1,14 +1,31 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createProject, updateProject } from "./store";
 import type { CommandRunner } from "./types";
-import type { CreateProjectFromOutlineInput, DeckOutlineSlide, ProjectMetadata } from "./types";
+import type {
+  ApplyDeckOutlineInput,
+  CreateProjectFromOutlineInput,
+  DeckOutline,
+  DeckOutlineSlide,
+  ProjectMetadata
+} from "./types";
 
 const openSlideCoreVersion = "^1.0.6";
 
 type ExportDeckInput = {
   deckPath: string;
   outputPath: string;
+  runner: CommandRunner;
+};
+
+type InstallDeckInput = {
+  deckPath: string;
+  runner: CommandRunner;
+};
+
+type StartDeckPreviewInput = {
+  deckPath: string;
+  port: number;
   runner: CommandRunner;
 };
 
@@ -77,8 +94,8 @@ function createOpenSlideConfig(): string {
   ].join("\n");
 }
 
-function createSlideSource(input: CreateProjectFromOutlineInput): string {
-  const slides = normalizeSlides(input.outline.slides);
+function createSlideSource(outline: DeckOutline): string {
+  const slides = normalizeSlides(outline.slides);
 
   return `import type { CSSProperties } from "react";
 import type { DesignSystem, Page, SlideMeta } from "@open-slide/core";
@@ -155,10 +172,10 @@ function TitlePage() {
       <div>
         <p style={{ fontSize: 30, margin: "0 0 28px", color: colors.sunlight }}>Solutions deck</p>
         <h1 style={{ fontSize: 112, lineHeight: 1, margin: 0, maxWidth: 1320 }}>
-          ${JSON.stringify(input.outline.title)}
+          ${JSON.stringify(outline.title)}
         </h1>
         <p style={{ fontSize: 38, lineHeight: 1.28, margin: "44px 0 0", maxWidth: 1180 }}>
-          ${JSON.stringify(input.outline.summary)}
+          ${JSON.stringify(outline.summary)}
         </p>
       </div>
     </section>
@@ -214,50 +231,73 @@ const pages: Page[] = [
 ];
 
 export const meta: SlideMeta = {
-  title: ${JSON.stringify(input.outline.title)}
+  title: ${JSON.stringify(outline.title)}
 };
 
 export default pages satisfies Page[];
 `;
 }
 
-async function writeOpenSlideWorkspace(input: CreateProjectFromOutlineInput & { deckPath: string }) {
-  const deckId = kebabCase(input.outline.title);
-  const slideDir = join(input.deckPath, "slides", deckId);
+async function writeDeckSlideFile(deckPath: string, outline: DeckOutline, slideDirName: string): Promise<void> {
+  const slideDir = join(deckPath, "slides", slideDirName);
 
   await mkdir(slideDir, { recursive: true });
+  await writeFile(join(slideDir, "index.tsx"), createSlideSource(outline), "utf8");
+}
+
+async function writeOpenSlideWorkspace(input: CreateProjectFromOutlineInput & { deckPath: string }) {
+  const slideDirName = kebabCase(input.outline.title);
   await writeFile(join(input.deckPath, "package.json"), createPackageJson(input.outline.title), "utf8");
   await writeFile(join(input.deckPath, "open-slide.config.ts"), createOpenSlideConfig(), "utf8");
-  await writeFile(join(slideDir, "index.tsx"), createSlideSource(input), "utf8");
+  await writeDeckSlideFile(input.deckPath, input.outline, slideDirName);
+  return slideDirName;
 }
 
 export async function createProjectFromOutline(
   input: CreateProjectFromOutlineInput
 ): Promise<ProjectMetadata> {
   const project = await createProject({ name: input.outline.title, workspaceRoot: input.workspaceRoot });
-  await writeOpenSlideWorkspace({ ...input, deckPath: project.deckPath });
+  const slideDirName = await writeOpenSlideWorkspace({ ...input, deckPath: project.deckPath });
 
   const root = join(input.workspaceRoot, project.id);
   return updateProject(root, (current) => ({
     ...current,
     sourcePrompt: input.prompt,
     outline: input.outline,
-    slideCount: normalizeSlides(input.outline.slides).length
+    slideCount: normalizeSlides(input.outline.slides).length,
+    slideDirName
   }));
 }
 
-async function exportDeck(input: ExportDeckInput, kind: "pdf" | "html"): Promise<void> {
+export async function applyDeckOutlineEdit(input: ApplyDeckOutlineInput): Promise<ProjectMetadata> {
+  const slideDirName = input.project.slideDirName ?? kebabCase(input.project.name);
+  await writeDeckSlideFile(input.project.deckPath, input.outline, slideDirName);
+
+  return updateProject(dirname(input.project.deckPath), (current) => ({
+    ...current,
+    name: input.outline.title,
+    outline: input.outline,
+    slideCount: normalizeSlides(input.outline.slides).length,
+    sourcePrompt: current.sourcePrompt,
+    lastEditPrompt: input.editPrompt,
+    slideDirName
+  }));
+}
+
+export async function installDeckDependencies(input: InstallDeckInput): Promise<void> {
+  await input.runner.run("npm", ["install"], { cwd: input.deckPath });
+}
+
+export async function startDeckPreview(input: StartDeckPreviewInput): Promise<void> {
   await input.runner.run(
     "npm",
-    ["exec", "--", "open-slide", "export", kind, "--out", input.outputPath],
+    ["run", "dev", "--", "--port", String(input.port), "--host", "127.0.0.1", "--no-skills-check"],
     { cwd: input.deckPath }
   );
 }
 
-export async function exportDeckToPdf(input: ExportDeckInput): Promise<void> {
-  await exportDeck(input, "pdf");
-}
-
 export async function exportDeckToHtml(input: ExportDeckInput): Promise<void> {
-  await exportDeck(input, "html");
+  await input.runner.run("npm", ["run", "build", "--", "--out-dir", input.outputPath], {
+    cwd: input.deckPath
+  });
 }
