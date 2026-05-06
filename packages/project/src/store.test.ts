@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -12,6 +12,7 @@ describe("project store", () => {
 
     expect(project.name).toBe("Quarterly Update");
     expect(project.deckPath.endsWith("/deck")).toBe(true);
+    expect((await stat(project.deckPath)).isDirectory()).toBe(true);
 
     const saved = await readProject(join(workspaceRoot, project.id));
     expect(saved).toEqual(project);
