@@ -7,6 +7,8 @@ import type { AppSettings, ChatMessage, DeckOutline } from "../shared/types";
 import "./styles.css";
 
 const initialSettings: AppSettings = { hasGeminiApiKey: false };
+const bridgeUnavailableMessage =
+  "This is a browser or file preview. Run npm run dev from the project folder and use the Electron window to save Gemini keys.";
 
 function createMessageId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -23,22 +25,29 @@ export function App() {
   const [lastPrompt, setLastPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDesktopBridgeAvailable = Boolean(window.idrisSlides);
 
   useEffect(() => {
-    void window.idrisSlides?.getSettings().then(setSettings);
+    if (window.idrisSlides) {
+      void window.idrisSlides.getSettings().then(setSettings);
+    }
   }, []);
 
   const chatStatus = useMemo(() => {
+    if (!isDesktopBridgeAvailable) {
+      return "Electron app required";
+    }
+
     if (settings.hasGeminiApiKey) {
       return "Gemini ready";
     }
 
     return "Gemini API key required";
-  }, [settings.hasGeminiApiKey]);
+  }, [isDesktopBridgeAvailable, settings.hasGeminiApiKey]);
 
   async function saveKey(): Promise<void> {
     if (!window.idrisSlides) {
-      setError("Desktop bridge is unavailable.");
+      setError(bridgeUnavailableMessage);
       return;
     }
 
@@ -96,7 +105,7 @@ export function App() {
 
   async function approveOutline(outline: DeckOutline): Promise<void> {
     if (!window.idrisSlides) {
-      setError("Desktop bridge is unavailable.");
+      setError(bridgeUnavailableMessage);
       return;
     }
 
@@ -142,11 +151,12 @@ export function App() {
           <button type="button">Light</button>
         </div>
       </header>
+      {!isDesktopBridgeAvailable ? <div className="bridgeNotice">{bridgeUnavailableMessage}</div> : null}
       <div className="workspace">
         <ProjectSidebar projects={projects} activeProjectId={activeProject?.id ?? null} />
         <PreviewPane project={activeProject} />
         <ChatPanel
-          canSend={settings.hasGeminiApiKey}
+          canSend={isDesktopBridgeAvailable && settings.hasGeminiApiKey}
           isGenerating={isGenerating}
           message={message}
           messages={messages}
@@ -170,11 +180,14 @@ export function App() {
               />
             </label>
             {error ? <p className="errorText">{error}</p> : null}
+            {!isDesktopBridgeAvailable ? (
+              <p className="bridgeHelp">{bridgeUnavailableMessage}</p>
+            ) : null}
             <div className="modalActions">
               <button type="button" onClick={() => setSettingsOpen(false)}>
                 Cancel
               </button>
-              <button type="button" onClick={() => void saveKey()}>
+              <button type="button" disabled={!isDesktopBridgeAvailable} onClick={() => void saveKey()}>
                 Save key
               </button>
             </div>

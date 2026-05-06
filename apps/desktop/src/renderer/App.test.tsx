@@ -52,6 +52,19 @@ describe("App", () => {
     expect(screen.getByText("AI Chat")).toBeInTheDocument();
   });
 
+  it("explains when the renderer is opened without the Electron bridge", () => {
+    window.idrisSlides = undefined;
+
+    render(<App />);
+
+    expect(screen.getByText(/browser or file preview/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getAllByText(/run npm run dev from the project folder/i)).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Save key" })).toBeDisabled();
+  });
+
   it("saves a Gemini API key and generates an outline from chat", async () => {
     render(<App />);
 
