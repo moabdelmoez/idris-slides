@@ -2,14 +2,14 @@ import type { CommandRunner } from "./types";
 
 type ExportDeckInput = {
   deckPath: string;
-  outPath: string;
+  outputPath: string;
   runner: CommandRunner;
 };
 
 async function exportDeck(input: ExportDeckInput, kind: "pdf" | "html"): Promise<void> {
   await input.runner.run(
     "npm",
-    ["exec", "--", "open-slide", "export", kind, "--out", input.outPath],
+    ["exec", "--", "open-slide", "export", kind, "--out", input.outputPath],
     { cwd: input.deckPath }
   );
 }

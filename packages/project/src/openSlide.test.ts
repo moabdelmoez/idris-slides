@@ -24,7 +24,7 @@ describe("open-slide command orchestration", () => {
 
     await exportDeckToPdf({
       deckPath: "/tmp/project/deck",
-      outPath: "/tmp/out/deck.pdf",
+      outputPath: "/tmp/out/deck.pdf",
       runner
     });
 
@@ -42,7 +42,7 @@ describe("open-slide command orchestration", () => {
 
     await exportDeckToHtml({
       deckPath: "/tmp/project/deck",
-      outPath: "/tmp/out/site",
+      outputPath: "/tmp/out/site",
       runner
     });
 
