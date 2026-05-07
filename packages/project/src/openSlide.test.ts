@@ -75,6 +75,36 @@ describe("open-slide command orchestration", () => {
     expect(project.slideDirName).toBe("market-expansion");
   });
 
+  it("does not add an extra title page beyond the approved outline slides", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create a 1 slide deck with hello in the middle",
+      outline: {
+        title: "Welcome Slide",
+        summary: "A single slide with hello centered.",
+        slides: [
+          {
+            title: "Hello",
+            goal: "Show hello in the middle of the slide.",
+            layout: "Title slide",
+            visualDirection: "Use purple with the word hello centered."
+          }
+        ]
+      }
+    });
+
+    const slideFile = await readFile(
+      join(project.deckPath, "slides", "welcome-slide", "index.tsx"),
+      "utf8"
+    );
+
+    expect(project.slideCount).toBe(1);
+    expect(slideFile).not.toContain("TitlePage");
+    expect(slideFile).toContain("...slideSpecs.map");
+  });
+
   it("installs deck dependencies through npm install", async () => {
     const { calls, runner } = createRecordingRunner();
 

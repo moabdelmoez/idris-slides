@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { KeyRound, Monitor, Settings } from "lucide-react";
 import { ChatPanel } from "./components/ChatPanel";
 import { PreviewPane } from "./components/PreviewPane";
-import { ProjectSidebar } from "./components/ProjectSidebar";
 import type { ProjectMetadata } from "@idris-slides/project";
 import type { AppSettings, ChatMessage, DeckOutline } from "../shared/types";
 import "./styles.css";
@@ -29,6 +29,7 @@ export function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isDesktopBridgeAvailable = Boolean(window.idrisSlides);
+  const hasActiveProject = Boolean(activeProject);
 
   useEffect(() => {
     if (window.idrisSlides) {
@@ -230,41 +231,74 @@ export function App() {
   }
 
   return (
-    <div className="appShell">
+    <div className={`appShell ${hasActiveProject ? "hasProject" : "isIntro"}`}>
       <header className="topBar">
-        <h1>Idris Slides</h1>
+        <div className="topBarIdentity">
+          <h1>{activeProject?.name ?? "Idris Slides"}</h1>
+          <span>{activeProject ? "Deck workspace" : "New deck"}</span>
+        </div>
         <div className="topBarActions">
-          <button type="button" onClick={() => setSettingsOpen(true)}>
-            Settings
+          <span className={settings.hasGeminiApiKey ? "systemStatus ready" : "systemStatus missing"}>
+            {chatStatus}
+          </span>
+          <button className="toolbarButton" type="button" onClick={() => setSettingsOpen(true)}>
+            <Settings size={16} aria-hidden="true" />
+            <span>Settings</span>
           </button>
-          <button type="button">Light</button>
         </div>
       </header>
-      {!isDesktopBridgeAvailable ? <div className="bridgeNotice">{bridgeUnavailableMessage}</div> : null}
+      {!isDesktopBridgeAvailable ? (
+        <div className="bridgeNotice">
+          <Monitor size={16} aria-hidden="true" />
+          <span>{bridgeUnavailableMessage}</span>
+        </div>
+      ) : null}
       <div className="workspace">
-        <ProjectSidebar projects={projects} activeProjectId={activeProject?.id ?? null} />
-        <PreviewPane
-          isExporting={isExporting}
-          isPreviewing={isPreviewing}
-          onExport={(kind) => void exportProject(kind)}
-          previewUrl={previewUrl}
-          project={activeProject}
-        />
+        {activeProject ? (
+          <main className="deckStage">
+            <PreviewPane
+              isExporting={isExporting}
+              isPreviewing={isPreviewing}
+              onExport={(kind) => void exportProject(kind)}
+              previewUrl={previewUrl}
+              project={activeProject}
+            />
+            <ChatPanel
+              canSend={isDesktopBridgeAvailable && settings.hasGeminiApiKey}
+              isGenerating={isGenerating}
+              message={message}
+              messages={messages}
+              mode="dock"
+              onMessageChange={setMessage}
+              onApproveOutline={(outline) => void approveOutline(outline)}
+              onSubmit={() => void submitPrompt()}
+              status={chatStatus}
+            />
+          </main>
+        ) : (
         <ChatPanel
           canSend={isDesktopBridgeAvailable && settings.hasGeminiApiKey}
           isGenerating={isGenerating}
           message={message}
           messages={messages}
+          mode="intro"
           onMessageChange={setMessage}
           onApproveOutline={(outline) => void approveOutline(outline)}
           onSubmit={() => void submitPrompt()}
           status={chatStatus}
         />
+        )}
       </div>
       {settingsOpen ? (
         <div className="modalBackdrop" role="presentation">
           <section aria-label="Settings" className="settingsModal">
-            <h2>Settings</h2>
+            <div className="modalHeader">
+              <div>
+                <h2>Settings</h2>
+                <p>Connect Gemini to generate and edit decks.</p>
+              </div>
+              <KeyRound size={18} aria-hidden="true" />
+            </div>
             <label>
               Gemini API key
               <input
@@ -282,7 +316,12 @@ export function App() {
               <button type="button" onClick={() => setSettingsOpen(false)}>
                 Cancel
               </button>
-              <button type="button" disabled={!isDesktopBridgeAvailable} onClick={() => void saveKey()}>
+              <button
+                className="primaryButton"
+                type="button"
+                disabled={!isDesktopBridgeAvailable}
+                onClick={() => void saveKey()}
+              >
                 Save key
               </button>
             </div>

@@ -90,9 +90,8 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Idris Slides" })).toBeInTheDocument();
-    expect(screen.getByText("Projects")).toBeInTheDocument();
-    expect(screen.getByText("Live Preview")).toBeInTheDocument();
-    expect(screen.getByText("AI Chat")).toBeInTheDocument();
+    expect(screen.getByText("What slides should Idris build?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Deck command")).toBeInTheDocument();
   });
 
   it("explains when the renderer is opened without the Electron bridge", () => {
@@ -111,7 +110,7 @@ describe("App", () => {
   it("saves a Gemini API key and generates an outline from chat", async () => {
     render(<App />);
 
-    expect(await screen.findByText("Gemini API key required")).toBeInTheDocument();
+    expect(await screen.findAllByText("Gemini API key required")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.change(screen.getByLabelText("Gemini API key"), {
@@ -120,20 +119,22 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save key" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Gemini ready")).toBeInTheDocument();
+      expect(screen.getAllByText("Gemini ready")).toHaveLength(2);
     });
 
-    fireEvent.change(screen.getByLabelText("Message"), {
+    fireEvent.change(screen.getByLabelText("Deck command"), {
       target: { value: "Create a 5 slide deck about market expansion" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByText("Market Expansion")).toBeInTheDocument();
     expect(screen.getByText("Opportunity")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Approve outline" })).toBeEnabled();
+    });
     fireEvent.click(screen.getByRole("button", { name: "Approve outline" }));
 
-    expect(await screen.findByText("Market Expansion", { selector: ".projectName" })).toBeInTheDocument();
-    expect(screen.getByText("1 slide generated")).toBeInTheDocument();
+    expect(await screen.findByText("Preview")).toBeInTheDocument();
     expect(await screen.findByTitle("Live open-slide preview")).toHaveAttribute(
       "src",
       "http://127.0.0.1:5317"
@@ -148,7 +149,7 @@ describe("App", () => {
       );
     });
 
-    fireEvent.change(screen.getByLabelText("Message"), {
+    fireEvent.change(screen.getByLabelText("Deck command"), {
       target: { value: "Make this more executive" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));

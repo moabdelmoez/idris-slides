@@ -157,32 +157,32 @@ function BrandMark() {
   );
 }
 
-function TitlePage() {
-  return (
-    <section
-      style={{
-        ...shell,
-        background: colors.purple,
-        color: colors.air,
-        justifyContent: "center",
-        gap: 54
-      }}
-    >
-      <BrandMark />
-      <div>
-        <p style={{ fontSize: 30, margin: "0 0 28px", color: colors.sunlight }}>Solutions deck</p>
-        <h1 style={{ fontSize: 112, lineHeight: 1, margin: 0, maxWidth: 1320 }}>
-          ${JSON.stringify(outline.title)}
-        </h1>
-        <p style={{ fontSize: 38, lineHeight: 1.28, margin: "44px 0 0", maxWidth: 1180 }}>
-          ${JSON.stringify(outline.summary)}
-        </p>
-      </div>
-    </section>
-  );
-}
-
 function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  const isTitleLayout = slide.layout.toLowerCase().includes("title");
+
+  if (isTitleLayout) {
+    return (
+      <section
+        style={{
+          ...shell,
+          background: colors.purple,
+          color: colors.air,
+          justifyContent: "center",
+          gap: 54
+        }}
+      >
+        <BrandMark />
+        <div>
+          <p style={{ fontSize: 30, margin: "0 0 28px", color: colors.sunlight }}>Solutions deck</p>
+          <h1 style={{ fontSize: 112, lineHeight: 1, margin: 0, maxWidth: 1320 }}>{slide.title}</h1>
+          <p style={{ fontSize: 38, lineHeight: 1.28, margin: "44px 0 0", maxWidth: 1180 }}>
+            {slide.goal}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section style={shell}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -223,7 +223,6 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
 }
 
 const pages: Page[] = [
-  TitlePage,
   ...slideSpecs.map((slide, index) => {
     const GeneratedPage: Page = () => <ContentPage index={index} slide={slide} />;
     return GeneratedPage;
