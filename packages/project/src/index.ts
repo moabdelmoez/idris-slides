@@ -1,4 +1,4 @@
 export * from "./paths";
-export * from "./openSlide";
+export * from "./runtime";
 export * from "./store";
 export * from "./types";

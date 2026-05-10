@@ -20,6 +20,20 @@ function createWindow(): void {
     }
   });
 
+  window.webContents.on("console-message", (details) => {
+    console.log(
+      `[IDRIS-DEBUG renderer:${details.level}] ${details.message} (${details.sourceId}:${details.lineNumber})`
+    );
+  });
+
+  window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[IDRIS-DEBUG renderer-load-failed] ${errorCode} ${errorDescription} ${validatedURL}`);
+  });
+
+  window.webContents.on("render-process-gone", (_event, details) => {
+    console.error(`[IDRIS-DEBUG renderer-process-gone] ${details.reason} exitCode=${details.exitCode}`);
+  });
+
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {

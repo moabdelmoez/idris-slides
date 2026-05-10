@@ -40,7 +40,7 @@ const outlineSchema = {
 
 function buildOutlinePrompt(prompt: string): string {
   return [
-    "Create a presentation outline for a Solutions/STC branded open-slide deck.",
+    "Create a presentation outline for a Solutions/STC branded Idris Slides deck.",
     "The slides array is the complete deck. Do not assume or add a separate title page outside the requested slide count.",
     "If the user asks for an exact number of slides, return exactly that many slide objects.",
     "If the user asks for one slide, return a single slide object that contains the requested content.",
@@ -55,7 +55,7 @@ function buildOutlinePrompt(prompt: string): string {
 
 function buildEditPrompt(project: ProjectMetadata, editPrompt: string): string {
   return [
-    "Revise an existing Solutions/STC branded open-slide deck outline.",
+    "Revise an existing Solutions/STC branded Idris Slides deck outline.",
     "Return the full updated outline JSON, not a partial patch.",
     "The slides array is the complete deck. Do not assume or add a separate title page outside the requested slide count.",
     "If the user asks for an exact number of slides, return exactly that many slide objects.",

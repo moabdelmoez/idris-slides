@@ -48,7 +48,9 @@ describe("App", () => {
       }),
       startPreview: vi.fn().mockResolvedValue({
         projectId: "project-1",
-        url: "http://127.0.0.1:5317"
+        url: "http://127.0.0.1:5317",
+        slideModuleUrl:
+          "data:text/javascript,export%20default%20%5Bfunction%20PreviewTestPage()%20%7B%20return%20null%3B%20%7D%5D%3B#initial=1"
       }),
       exportProject: vi.fn().mockResolvedValue({
         id: "project-1",
@@ -135,10 +137,8 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Approve outline" }));
 
     expect(await screen.findByText("Preview")).toBeInTheDocument();
-    expect(await screen.findByTitle("Live open-slide preview")).toHaveAttribute(
-      "src",
-      "http://127.0.0.1:5317"
-    );
+    expect(await screen.findByText("Deck preview loaded.")).toBeInTheDocument();
+    expect(screen.queryByTitle("Live deck preview")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Export HTML" }));
 
@@ -166,5 +166,79 @@ describe("App", () => {
       expect.objectContaining({ id: "project-1" }),
       "Make this more executive"
     );
+  });
+
+  it("cache-busts the slide module after deck edits instead of relying on Vite page reloads", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Gemini API key"), {
+      target: { value: "test-key" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Gemini ready")).toHaveLength(2);
+    });
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Create one-slide deck contains Mostafa" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve outline" }));
+
+    expect(await screen.findByText("Deck preview loaded.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Make the title larger" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => {
+      expect(
+        consoleSpy.mock.calls.some(([message]) =>
+          String(message).includes("[IDRIS-DEBUG preview-import-start]") && String(message).includes("idrisReload=")
+        )
+      ).toBe(true);
+    });
+  });
+
+  it("keeps the preview and docked chat available after many messages", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Gemini API key"), {
+      target: { value: "test-key" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Gemini ready")).toHaveLength(2);
+    });
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Create one-slide deck contains Mostafa" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve outline" }));
+
+    expect(await screen.findByText("Deck preview loaded.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Command panel")).toHaveClass("dockPanel");
+    expect(screen.getByLabelText("Deck command")).toBeInTheDocument();
+
+    for (let index = 0; index < 8; index += 1) {
+      fireEvent.change(screen.getByLabelText("Deck command"), {
+        target: { value: `Make revision ${index}` }
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+      await waitFor(() => {
+        expect(screen.getAllByText("More executive and metric-led.").length).toBeGreaterThan(index);
+      });
+    }
+
+    expect(await screen.findByText("Deck preview loaded.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Deck command")).toBeInTheDocument();
   });
 });

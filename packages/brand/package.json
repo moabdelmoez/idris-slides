@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run src"
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^18.3.1"

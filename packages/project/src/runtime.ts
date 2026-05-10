@@ -1,5 +1,7 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createProject, updateProject } from "./store";
 import type { CommandRunner } from "./types";
 import type {
@@ -10,7 +12,34 @@ import type {
   ProjectMetadata
 } from "./types";
 
-const openSlideCoreVersion = "^1.0.6";
+const currentDir = dirname(fileURLToPath(import.meta.url));
+
+function ancestorDirs(startDir: string): string[] {
+  const dirs: string[] = [];
+  let current = resolve(startDir);
+
+  while (true) {
+    dirs.push(current);
+    const parent = dirname(current);
+    if (parent === current) {
+      return dirs;
+    }
+    current = parent;
+  }
+}
+
+export function resolveWorkspacePackagePath(packageName: "brand" | "core", startDirs = [currentDir, process.cwd()]): string {
+  for (const startDir of startDirs) {
+    for (const candidateRoot of ancestorDirs(startDir)) {
+      const packagePath = join(candidateRoot, "packages", packageName);
+      if (existsSync(join(packagePath, "package.json"))) {
+        return packagePath;
+      }
+    }
+  }
+
+  throw new Error(`Unable to locate @idris-slides/${packageName} package from ${startDirs.join(", ")}.`);
+}
 
 type ExportDeckInput = {
   deckPath: string;
@@ -55,7 +84,14 @@ function normalizeSlides(slides: DeckOutlineSlide[]): DeckOutlineSlide[] {
       ];
 }
 
+function fileDependency(path: string): string {
+  return `file:${path}`;
+}
+
 function createPackageJson(name: string): string {
+  const corePackagePath = resolveWorkspacePackagePath("core");
+  const brandPackagePath = resolveWorkspacePackagePath("brand");
+
   return `${JSON.stringify(
     {
       name: toPackageName(name),
@@ -63,19 +99,20 @@ function createPackageJson(name: string): string {
       version: "0.0.0",
       type: "module",
       scripts: {
-        dev: "open-slide dev",
-        build: "open-slide build",
-        preview: "open-slide preview"
+        dev: "vite",
+        build: "vite build",
+        preview: "vite preview"
       },
       dependencies: {
-        "@open-slide/core": openSlideCoreVersion,
+        "@idris-slides/core": fileDependency(corePackagePath),
+        "@idris-slides/brand": fileDependency(brandPackagePath),
         react: "^18.3.1",
         "react-dom": "^18.3.1"
       },
       devDependencies: {
         "@types/react": "^18.3.12",
         "@types/react-dom": "^18.3.1",
-        vite: "^5.4.10"
+        vite: "^7.0.0"
       }
     },
     null,
@@ -83,13 +120,70 @@ function createPackageJson(name: string): string {
   )}\n`;
 }
 
-function createOpenSlideConfig(): string {
+function createViteConfig(): string {
   return [
-    'import type { OpenSlideConfig } from "@open-slide/core";',
+    'import { defineConfig } from "vite";',
     "",
-    "const openSlideConfig: OpenSlideConfig = {};",
+    "export default defineConfig({",
+    "  esbuild: {",
+    '    jsx: "automatic"',
+    "  },",
+    "  server: {",
+    "    hmr: false",
+    "  }",
+    "});",
+    ""
+  ].join("\n");
+}
+
+function createIndexHtml(): string {
+  return [
+    '<!doctype html>',
+    '<html lang="en">',
+    "  <head>",
+    '    <meta charset="UTF-8" />',
+    '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+    "    <title>Idris Slides</title>",
+    "  </head>",
+    "  <body>",
+    '    <div id="root"></div>',
+    '    <script type="module" src="/src/main.tsx"></script>',
+    "  </body>",
+    "</html>",
+    ""
+  ].join("\n");
+}
+
+function createDeckEntry(slideDirName: string): string {
+  return `import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { SlideDeck } from "@idris-slides/core";
+import pages from "../slides/${slideDirName}/index";
+
+import "./styles.css";
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <SlideDeck pages={pages} presentMode />
+  </StrictMode>
+);
+`;
+}
+
+function createDeckStyles(): string {
+  return [
+    "html,",
+    "body,",
+    "#root {",
+    "  width: 100%;",
+    "  height: 100%;",
+    "  margin: 0;",
+    "}",
     "",
-    "export default openSlideConfig;",
+    "body {",
+    "  background: #111827;",
+    "  overflow: hidden;",
+    "}",
     ""
   ].join("\n");
 }
@@ -98,7 +192,7 @@ function createSlideSource(outline: DeckOutline): string {
   const slides = normalizeSlides(outline.slides);
 
   return `import type { CSSProperties } from "react";
-import type { DesignSystem, Page, SlideMeta } from "@open-slide/core";
+import type { Page } from "@idris-slides/core";
 
 const colors = {
   air: "#ffffff",
@@ -113,22 +207,10 @@ const colors = {
   onyx: "#1d252d"
 } as const;
 
-export const design: DesignSystem = {
-  palette: {
-    bg: colors.air,
-    text: colors.onyx,
-    accent: colors.purple
-  },
-  fonts: {
-    display: '"STCForward", "STC Forward", Arial, sans-serif',
-    body: '"STCForward", "STC Forward", Arial, sans-serif'
-  },
-  typeScale: {
-    hero: 108,
-    body: 32
-  },
-  radius: 8
-};
+const fonts = {
+  display: '"STCForward", "STC Forward", Arial, sans-serif',
+  body: '"STCForward", "STC Forward", Arial, sans-serif'
+} as const;
 
 const slideSpecs = ${JSON.stringify(slides, null, 2)} as const;
 
@@ -138,7 +220,7 @@ const shell: CSSProperties = {
   boxSizing: "border-box",
   background: colors.air,
   color: colors.onyx,
-  fontFamily: design.fonts.body,
+  fontFamily: fonts.body,
   padding: "92px 104px",
   display: "flex",
   flexDirection: "column",
@@ -229,7 +311,7 @@ const pages: Page[] = [
   })
 ];
 
-export const meta: SlideMeta = {
+export const meta = {
   title: ${JSON.stringify(outline.title)}
 };
 
@@ -244,19 +326,34 @@ async function writeDeckSlideFile(deckPath: string, outline: DeckOutline, slideD
   await writeFile(join(slideDir, "index.tsx"), createSlideSource(outline), "utf8");
 }
 
-async function writeOpenSlideWorkspace(input: CreateProjectFromOutlineInput & { deckPath: string }) {
+async function writeIdrisDeckWorkspace(input: CreateProjectFromOutlineInput & { deckPath: string }) {
   const slideDirName = kebabCase(input.outline.title);
+  await mkdir(join(input.deckPath, "src"), { recursive: true });
   await writeFile(join(input.deckPath, "package.json"), createPackageJson(input.outline.title), "utf8");
-  await writeFile(join(input.deckPath, "open-slide.config.ts"), createOpenSlideConfig(), "utf8");
+  await writeFile(join(input.deckPath, "vite.config.ts"), createViteConfig(), "utf8");
+  await writeFile(join(input.deckPath, "index.html"), createIndexHtml(), "utf8");
+  await writeFile(join(input.deckPath, "src", "main.tsx"), createDeckEntry(slideDirName), "utf8");
+  await writeFile(join(input.deckPath, "src", "styles.css"), createDeckStyles(), "utf8");
   await writeDeckSlideFile(input.deckPath, input.outline, slideDirName);
   return slideDirName;
+}
+
+export async function repairDeckRuntimeWorkspace(project: ProjectMetadata): Promise<void> {
+  const slideDirName = project.slideDirName ?? kebabCase(project.name);
+
+  await mkdir(join(project.deckPath, "src"), { recursive: true });
+  await writeFile(join(project.deckPath, "package.json"), createPackageJson(project.name), "utf8");
+  await writeFile(join(project.deckPath, "vite.config.ts"), createViteConfig(), "utf8");
+  await writeFile(join(project.deckPath, "index.html"), createIndexHtml(), "utf8");
+  await writeFile(join(project.deckPath, "src", "main.tsx"), createDeckEntry(slideDirName), "utf8");
+  await writeFile(join(project.deckPath, "src", "styles.css"), createDeckStyles(), "utf8");
 }
 
 export async function createProjectFromOutline(
   input: CreateProjectFromOutlineInput
 ): Promise<ProjectMetadata> {
   const project = await createProject({ name: input.outline.title, workspaceRoot: input.workspaceRoot });
-  const slideDirName = await writeOpenSlideWorkspace({ ...input, deckPath: project.deckPath });
+  const slideDirName = await writeIdrisDeckWorkspace({ ...input, deckPath: project.deckPath });
 
   const root = join(input.workspaceRoot, project.id);
   return updateProject(root, (current) => ({
@@ -288,11 +385,9 @@ export async function installDeckDependencies(input: InstallDeckInput): Promise<
 }
 
 export async function startDeckPreview(input: StartDeckPreviewInput): Promise<void> {
-  await input.runner.run(
-    "npm",
-    ["run", "dev", "--", "--port", String(input.port), "--host", "127.0.0.1", "--no-skills-check"],
-    { cwd: input.deckPath }
-  );
+  await input.runner.run("npm", ["run", "dev", "--", "--port", String(input.port), "--host", "127.0.0.1"], {
+    cwd: input.deckPath
+  });
 }
 
 export async function exportDeckToHtml(input: ExportDeckInput): Promise<void> {

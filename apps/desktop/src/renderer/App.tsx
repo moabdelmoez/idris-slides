@@ -14,6 +14,18 @@ function createMessageId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
+function cacheBustSlideModuleUrl(slideModuleUrl: string): string {
+  const url = new URL(slideModuleUrl);
+
+  if (url.protocol === "data:") {
+    url.hash = `idrisReload=${Date.now()}`;
+    return url.toString();
+  }
+
+  url.searchParams.set("idrisReload", String(Date.now()));
+  return url.toString();
+}
+
 export function App() {
   const [settings, setSettings] = useState<AppSettings>(initialSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -22,7 +34,7 @@ export function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
   const [activeProject, setActiveProject] = useState<ProjectMetadata | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [slideModuleUrl, setSlideModuleUrl] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -83,6 +95,7 @@ export function App() {
       if (activeProject) {
         const project = await window.idrisSlides.editDeck(activeProject, trimmed);
         updateActiveProject(project);
+        setSlideModuleUrl((current) => (current ? cacheBustSlideModuleUrl(current) : current));
         setMessages((current) => [
           ...current,
           {
@@ -141,7 +154,7 @@ export function App() {
 
     try {
       const session = await window.idrisSlides.startPreview(project);
-      setPreviewUrl(session.url);
+      setSlideModuleUrl(session.slideModuleUrl);
     } catch (caught) {
       const detail = caught instanceof Error ? caught.message : "Unable to start live preview.";
       setError(detail);
@@ -260,7 +273,7 @@ export function App() {
               isExporting={isExporting}
               isPreviewing={isPreviewing}
               onExport={(kind) => void exportProject(kind)}
-              previewUrl={previewUrl}
+              slideModuleUrl={slideModuleUrl}
               project={activeProject}
             />
             <ChatPanel

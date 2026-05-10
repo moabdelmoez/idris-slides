@@ -25,4 +25,5 @@ export type ChatMessage = {
 export type PreviewSessionInfo = {
   projectId: string;
   url: string;
+  slideModuleUrl: string;
 };

@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+## Agent Commands
+
+- `/init`: read `AGENTS.md`, inspect the workspace structure, summarize the current repository context, and identify the safest next commands before making code changes.
+
 ## Project Structure & Module Organization
 
 This is an npm workspace monorepo for the Idris Slides desktop app. The Electron/Vite application lives in `apps/desktop`, with main-process code in `src/main`, the preload bridge in `src/preload`, shared app types in `src/shared`, and React renderer code in `src/renderer`. Reusable workspace packages live in `packages`: `packages/project` handles project/deck storage and open-slide generation, while `packages/brand` contains Solutions brand tokens, React components, font assets, and validation helpers. Tests are colocated with source as `*.test.ts` or `*.test.tsx`.

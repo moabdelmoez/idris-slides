@@ -7,7 +7,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ["@idris-slides/project"] })],
+    plugins: [externalizeDepsPlugin({ exclude: ["@idris-slides/core", "@idris-slides/project"] })],
     build: {
       rollupOptions: {
         input: resolve(currentDir, "src/main/main.ts")
@@ -17,7 +17,7 @@ export default defineConfig({
   preload: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ["@idris-slides/brand", "@idris-slides/project"]
+        exclude: ["@idris-slides/brand", "@idris-slides/core", "@idris-slides/project"]
       })
     ],
     build: {

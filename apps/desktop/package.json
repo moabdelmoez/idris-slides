@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@idris-slides/brand": "file:../../packages/brand",
+    "@idris-slides/core": "file:../../packages/core",
     "@idris-slides/project": "file:../../packages/project",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
