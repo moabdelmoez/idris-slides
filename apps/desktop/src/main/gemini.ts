@@ -27,11 +27,12 @@ const outlineSchema = {
         type: "OBJECT",
         properties: {
           title: { type: "STRING" },
+          content: { type: "STRING" },
           goal: { type: "STRING" },
           layout: { type: "STRING" },
           visualDirection: { type: "STRING" }
         },
-        required: ["title", "goal", "layout", "visualDirection"]
+        required: ["title", "content", "goal", "layout", "visualDirection"]
       }
     }
   },
@@ -44,6 +45,8 @@ function buildOutlinePrompt(prompt: string): string {
     "The slides array is the complete deck. Do not assume or add a separate title page outside the requested slide count.",
     "If the user asks for an exact number of slides, return exactly that many slide objects.",
     "If the user asks for one slide, return a single slide object that contains the requested content.",
+    "For each slide, content is the only audience-facing body copy that may appear on the slide.",
+    "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
     "Return concise, practical slide direction only.",
     "Use only approved brand language and visual direction.",
     "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
@@ -59,6 +62,8 @@ function buildEditPrompt(project: ProjectMetadata, editPrompt: string): string {
     "Return the full updated outline JSON, not a partial patch.",
     "The slides array is the complete deck. Do not assume or add a separate title page outside the requested slide count.",
     "If the user asks for an exact number of slides, return exactly that many slide objects.",
+    "For each slide, content is the only audience-facing body copy that may appear on the slide.",
+    "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
     "Preserve approved brand direction and use only approved layouts/colors.",
     "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
     "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide.",

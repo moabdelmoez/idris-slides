@@ -28,6 +28,7 @@ export type CreateProjectInput = {
 
 export type DeckOutlineSlide = {
   title: string;
+  content?: string;
   goal: string;
   layout: string;
   visualDirection: string;

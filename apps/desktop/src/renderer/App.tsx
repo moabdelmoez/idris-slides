@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyRound, Monitor, Settings } from "lucide-react";
 import { ChatPanel } from "./components/ChatPanel";
 import { PreviewPane } from "./components/PreviewPane";
@@ -48,18 +48,6 @@ export function App() {
       void window.idrisSlides.getSettings().then(setSettings);
     }
   }, []);
-
-  const chatStatus = useMemo(() => {
-    if (!isDesktopBridgeAvailable) {
-      return "Electron app required";
-    }
-
-    if (settings.hasGeminiApiKey) {
-      return "Gemini ready";
-    }
-
-    return "Gemini API key required";
-  }, [isDesktopBridgeAvailable, settings.hasGeminiApiKey]);
 
   async function saveKey(): Promise<void> {
     if (!window.idrisSlides) {
@@ -251,9 +239,6 @@ export function App() {
           <span>{activeProject ? "Deck workspace" : "New deck"}</span>
         </div>
         <div className="topBarActions">
-          <span className={settings.hasGeminiApiKey ? "systemStatus ready" : "systemStatus missing"}>
-            {chatStatus}
-          </span>
           <button className="toolbarButton" type="button" onClick={() => setSettingsOpen(true)}>
             <Settings size={16} aria-hidden="true" />
             <span>Settings</span>
@@ -285,7 +270,6 @@ export function App() {
               onMessageChange={setMessage}
               onApproveOutline={(outline) => void approveOutline(outline)}
               onSubmit={() => void submitPrompt()}
-              status={chatStatus}
             />
           </main>
         ) : (
@@ -298,25 +282,28 @@ export function App() {
           onMessageChange={setMessage}
           onApproveOutline={(outline) => void approveOutline(outline)}
           onSubmit={() => void submitPrompt()}
-          status={chatStatus}
         />
         )}
       </div>
       {settingsOpen ? (
         <div className="modalBackdrop" role="presentation">
-          <section aria-label="Settings" className="settingsModal">
+          <section aria-label="Settings" aria-modal="true" className="settingsModal" role="dialog">
             <div className="modalHeader">
               <div>
                 <h2>Settings</h2>
-                <p>Connect Gemini to generate and edit decks.</p>
+                <p>Connect Gemini for outline generation and deck revisions.</p>
               </div>
               <KeyRound size={18} aria-hidden="true" />
             </div>
-            <label>
-              Gemini API key
+            <label className="settingsField">
+              <span>Gemini API Key</span>
               <input
+                autoComplete="off"
                 aria-label="Gemini API key"
+                name="gemini-api-key"
                 onChange={(event) => setApiKey(event.target.value)}
+                placeholder="AIza…"
+                spellCheck={false}
                 type="password"
                 value={apiKey}
               />
@@ -335,7 +322,7 @@ export function App() {
                 disabled={!isDesktopBridgeAvailable}
                 onClick={() => void saveKey()}
               >
-                Save key
+                Save API Key
               </button>
             </div>
           </section>

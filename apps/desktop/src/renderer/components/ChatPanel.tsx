@@ -1,10 +1,9 @@
-import { ArrowUp, FileUp, Loader2, Plus, Sparkles } from "lucide-react";
+import { ArrowUp, ChevronDown, Loader2, Plus, Sparkles } from "lucide-react";
 import type { ChatMessage, DeckOutline } from "../../shared/types";
 
 type ChatPanelProps = {
   messages: ChatMessage[];
   message: string;
-  status: string;
   canSend: boolean;
   isGenerating: boolean;
   mode: "intro" | "dock";
@@ -16,7 +15,6 @@ type ChatPanelProps = {
 export function ChatPanel({
   messages,
   message,
-  status,
   canSend,
   isGenerating,
   mode,
@@ -34,18 +32,8 @@ export function ChatPanel({
     <section className={`chatPanel ${mode === "intro" ? "introPanel" : "dockPanel"}`} aria-label="Command panel">
       {mode === "intro" ? (
         <div className="introHeader">
-          <Sparkles size={22} aria-hidden="true" />
           <h2>What slides should Idris build?</h2>
           <p>Describe the client, audience, and source points. Idris drafts the outline before building the deck.</p>
-        </div>
-      ) : null}
-      {mode === "dock" ? (
-        <div className="chatHeader">
-          <div>
-            <p className="panelEyebrow">Conversation</p>
-            <h2>Command</h2>
-          </div>
-          <span className={canSend ? "statusReady" : "statusMissing"}>{status}</span>
         </div>
       ) : null}
       <div className="chatBody">
@@ -81,7 +69,7 @@ export function ChatPanel({
                     {item.outline.slides.map((slide) => (
                       <li key={`${item.id}-${slide.title}`}>
                         <strong>{slide.title}</strong>
-                        <span>{slide.goal}</span>
+                        <span>{slide.content ?? slide.goal}</span>
                       </li>
                     ))}
                   </ol>
@@ -118,38 +106,31 @@ export function ChatPanel({
             <Plus size={18} aria-hidden="true" />
           </button>
         ) : null}
-        <button
-          className="importButton"
-          aria-label="Import documents, planned"
-          disabled
-          title="Document import is planned"
-          type="button"
-        >
-          <FileUp size={15} aria-hidden="true" />
-          <span>Import</span>
-        </button>
         <input
           aria-label="Deck command"
           disabled={!canSend || isGenerating}
           onChange={(event) => onMessageChange(event.target.value)}
-          placeholder={mode === "intro" ? "Ask Idris to create a slide deck..." : composerPlaceholder}
+          placeholder={mode === "intro" ? "Ask Idris to create a slide deck…" : composerPlaceholder}
           value={message}
         />
-        <button className="sendButton" type="submit" disabled={!canSend || isGenerating || !message.trim()}>
+        <span className="modelChip" title="Gemini model: Gemini 2.5 Flash">
+          <span className="modelVersion">2.5</span>
+          <span>Flash</span>
+          <ChevronDown size={14} aria-hidden="true" />
+        </span>
+        <button
+          aria-label={isGenerating ? "Working" : "Send"}
+          className="sendButton"
+          type="submit"
+          disabled={!canSend || isGenerating || !message.trim()}
+        >
           {isGenerating ? (
             <Loader2 className="loadingIcon" size={16} aria-hidden="true" />
           ) : (
             <ArrowUp size={16} aria-hidden="true" />
           )}
-          <span>{isGenerating ? "Working" : "Send"}</span>
         </button>
       </form>
-      {mode === "intro" ? (
-        <div className="composerMeta">
-          <span className={canSend ? "statusReady" : "statusMissing"}>{status}</span>
-          <span>Plain chat now, document import later</span>
-        </div>
-      ) : null}
     </section>
   );
 }

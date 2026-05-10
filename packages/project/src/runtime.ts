@@ -58,6 +58,12 @@ type StartDeckPreviewInput = {
   runner: CommandRunner;
 };
 
+type RenderableSlide = {
+  title: string;
+  content: string;
+  layout: string;
+};
+
 function kebabCase(value: string): string {
   const id = value
     .toLowerCase()
@@ -77,11 +83,20 @@ function normalizeSlides(slides: DeckOutlineSlide[]): DeckOutlineSlide[] {
     : [
         {
           title: "Opening",
+          content: "Introduce the deck narrative.",
           goal: "Introduce the deck narrative.",
           layout: "Title slide",
           visualDirection: "Use the approved Solutions purple title treatment."
         }
       ];
+}
+
+function toRenderableSlides(slides: DeckOutlineSlide[]): RenderableSlide[] {
+  return normalizeSlides(slides).map((slide) => ({
+    title: slide.title,
+    content: slide.content?.trim() ?? "",
+    layout: slide.layout
+  }));
 }
 
 function fileDependency(path: string): string {
@@ -189,7 +204,7 @@ function createDeckStyles(): string {
 }
 
 function createSlideSource(outline: DeckOutline): string {
-  const slides = normalizeSlides(outline.slides);
+  const slides = toRenderableSlides(outline.slides);
 
   return `import type { CSSProperties } from "react";
 import type { Page } from "@idris-slides/core";
@@ -258,7 +273,7 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
           <p style={{ fontSize: 30, margin: "0 0 28px", color: colors.sunlight }}>Solutions deck</p>
           <h1 style={{ fontSize: 112, lineHeight: 1, margin: 0, maxWidth: 1320 }}>{slide.title}</h1>
           <p style={{ fontSize: 38, lineHeight: 1.28, margin: "44px 0 0", maxWidth: 1180 }}>
-            {slide.goal}
+            {slide.content}
           </p>
         </div>
       </section>
@@ -275,25 +290,22 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
         <div>
           <p style={{ color: colors.purple, fontSize: 28, margin: "0 0 28px" }}>{slide.layout}</p>
           <h2 style={{ fontSize: 82, lineHeight: 1.04, margin: 0 }}>{slide.title}</h2>
-          <p style={{ fontSize: 36, lineHeight: 1.3, margin: "42px 0 0", color: colors.onyx }}>
-            {slide.goal}
-          </p>
         </div>
         <aside
           style={{
-            borderLeft: \`12px solid \${colors.coral}\`,
-            padding: "42px 0 42px 44px",
+            background: colors.purple,
+            color: colors.air,
+            padding: "54px",
             minHeight: 360,
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            gap: 28
+            gap: 28,
+            boxSizing: "border-box"
           }}
         >
-          <p style={{ color: colors.silver, fontSize: 24, margin: 0 }}>Visual direction</p>
-          <p style={{ color: colors.onyx, fontSize: 32, lineHeight: 1.34, margin: 0 }}>
-            {slide.visualDirection}
-          </p>
+          <p style={{ color: colors.sunlight, fontSize: 26, margin: 0 }}>{slide.layout}</p>
+          <p style={{ color: colors.air, fontSize: 34, lineHeight: 1.28, margin: 0 }}>{slide.content}</p>
         </aside>
       </main>
       <footer style={{ display: "flex", justifyContent: "space-between", color: colors.silver, fontSize: 22 }}>

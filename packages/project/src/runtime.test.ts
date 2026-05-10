@@ -65,12 +65,14 @@ describe("Idris deck runtime orchestration", () => {
         slides: [
           {
             title: "Opportunity",
+            content: "Priority markets create a clear expansion path.",
             goal: "Frame the growth opportunity.",
             layout: "Title slide",
             visualDirection: "Use purple with coral emphasis."
           },
           {
             title: "Operating Model",
+            content: "Launch readiness depends on coordinated commercial and delivery workstreams.",
             goal: "Show the workstreams required to launch.",
             layout: "Two-column slide",
             visualDirection: "Use sea and oasis accents."
@@ -107,6 +109,10 @@ describe("Idris deck runtime orchestration", () => {
     expect(slideFile).toContain("#4f008c");
     expect(slideFile).toContain("STCForward");
     expect(slideFile).toContain("Market Expansion");
+    expect(slideFile).toContain("Priority markets create a clear expansion path.");
+    expect(slideFile).not.toContain("Frame the growth opportunity.");
+    expect(slideFile).not.toContain("Use purple with coral emphasis.");
+    expect(slideFile).not.toContain("Visual direction");
     expect(slideFile).toContain("satisfies Page[]");
     expect(slideFile).toContain('from "@idris-slides/core"');
     expect(project.sourcePrompt).toBe("Create a deck about market expansion");
@@ -126,6 +132,7 @@ describe("Idris deck runtime orchestration", () => {
         slides: [
           {
             title: "Hello",
+            content: "Hello.",
             goal: "Show hello in the middle of the slide.",
             layout: "Title slide",
             visualDirection: "Use purple with the word hello centered."
@@ -156,6 +163,7 @@ describe("Idris deck runtime orchestration", () => {
         slides: [
           {
             title: "Hello",
+            content: "Hello.",
             goal: "Show hello in the middle of the slide.",
             layout: "Title slide",
             visualDirection: "Use purple with the word hello centered."

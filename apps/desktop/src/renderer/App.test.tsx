@@ -94,6 +94,9 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Idris Slides" })).toBeInTheDocument();
     expect(screen.getByText("What slides should Idris build?")).toBeInTheDocument();
     expect(screen.getByLabelText("Deck command")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add context" })).toBeInTheDocument();
+    expect(screen.getByTitle("Gemini model: Gemini 2.5 Flash")).toBeInTheDocument();
+    expect(screen.queryByText("Plain chat now, document import later")).not.toBeInTheDocument();
   });
 
   it("explains when the renderer is opened without the Electron bridge", () => {
@@ -106,23 +109,24 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(screen.getAllByText(/run npm run dev from the project folder/i)).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Save key" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save API Key" })).toBeDisabled();
   });
 
   it("saves a Gemini API key and generates an outline from chat", async () => {
     render(<App />);
 
-    expect(await screen.findAllByText("Gemini API key required")).toHaveLength(2);
+    expect(screen.queryByText("Gemini API key required")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.change(screen.getByLabelText("Gemini API key"), {
       target: { value: "test-key" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save API Key" }));
 
     await waitFor(() => {
-      expect(screen.getAllByText("Gemini ready")).toHaveLength(2);
+      expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
     });
+    expect(screen.queryByText("Gemini ready")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Deck command"), {
       target: { value: "Create a 5 slide deck about market expansion" }
@@ -177,10 +181,10 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Gemini API key"), {
       target: { value: "test-key" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save API Key" }));
 
     await waitFor(() => {
-      expect(screen.getAllByText("Gemini ready")).toHaveLength(2);
+      expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
     });
 
     fireEvent.change(screen.getByLabelText("Deck command"), {
@@ -212,10 +216,10 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Gemini API key"), {
       target: { value: "test-key" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save API Key" }));
 
     await waitFor(() => {
-      expect(screen.getAllByText("Gemini ready")).toHaveLength(2);
+      expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
     });
 
     fireEvent.change(screen.getByLabelText("Deck command"), {
@@ -227,6 +231,8 @@ describe("App", () => {
     expect(await screen.findByText("Deck preview loaded.")).toBeInTheDocument();
     expect(screen.getByLabelText("Command panel")).toHaveClass("dockPanel");
     expect(screen.getByLabelText("Deck command")).toBeInTheDocument();
+    expect(screen.queryByText("Conversation")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Command" })).not.toBeInTheDocument();
 
     for (let index = 0; index < 8; index += 1) {
       fireEvent.change(screen.getByLabelText("Deck command"), {
