@@ -2,13 +2,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  FileCode2,
+  FileType2,
   Loader2,
   Maximize2,
   Presentation,
   X
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties, type MouseEvent } from "react";
 import { SlideDeck, type Page } from "@idris-slides/core";
 import type { ProjectMetadata } from "@idris-slides/project";
 
@@ -17,7 +17,8 @@ type PreviewPaneProps = {
   slideModuleUrl: string | null;
   isPreviewing: boolean;
   isExporting: boolean;
-  onExport(kind: "pdf" | "html"): void;
+  onExport(kind: "pdf" | "html" | "pptx"): void;
+  onTextEdit(path: string, value: string): void;
 };
 
 type SlideModule = {
@@ -28,6 +29,7 @@ export function PreviewPane({
   isExporting,
   isPreviewing,
   onExport,
+  onTextEdit,
   slideModuleUrl,
   project
 }: PreviewPaneProps) {
@@ -35,6 +37,15 @@ export function PreviewPane({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [textEdit, setTextEdit] = useState<{
+    path: string;
+    value: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    style: CSSProperties;
+  } | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -43,12 +54,14 @@ export function PreviewPane({
       setPages(null);
       setIsFullscreen(false);
       setPreviewError(null);
+      setTextEdit(null);
       return;
     }
 
     setPages(null);
     setCurrentSlideIndex(0);
     setPreviewError(null);
+    setTextEdit(null);
     console.log(`[IDRIS-DEBUG preview-import-start] ${slideModuleUrl}`);
 
     void import(/* @vite-ignore */ slideModuleUrl)
@@ -116,6 +129,52 @@ export function PreviewPane({
     );
   }
 
+  function beginTextEdit(event: MouseEvent): void {
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>("[data-idris-edit-path]")
+      : null;
+
+    if (!target) {
+      return;
+    }
+
+    const path = target.dataset.idrisEditPath;
+    if (!path) {
+      return;
+    }
+
+    event.preventDefault();
+    const rect = target.getBoundingClientRect();
+    const style = window.getComputedStyle(target);
+    setTextEdit({
+      path,
+      value: target.textContent ?? "",
+      left: rect.left,
+      top: rect.top,
+      width: Math.max(rect.width, 220),
+      height: Math.max(rect.height, 72),
+      style: {
+        backgroundColor: "rgba(255, 255, 255, 0.08)",
+        color: style.color,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        letterSpacing: style.letterSpacing,
+        lineHeight: style.lineHeight,
+        textAlign: style.textAlign as CSSProperties["textAlign"]
+      }
+    });
+  }
+
+  function commitTextEdit(): void {
+    if (!textEdit) {
+      return;
+    }
+
+    onTextEdit(textEdit.path, textEdit.value);
+    setTextEdit(null);
+  }
+
   return (
     <main className="previewPane">
       <div className="previewHeader">
@@ -137,10 +196,10 @@ export function PreviewPane({
             className="toolbarButton"
             type="button"
             disabled={!project || isExporting}
-            onClick={() => onExport("html")}
+            onClick={() => onExport("pptx")}
           >
-            <FileCode2 size={15} aria-hidden="true" />
-            <span>Export HTML</span>
+            <FileType2 size={15} aria-hidden="true" />
+            <span>Export PowerPoint</span>
           </button>
           <button
             aria-label="Fullscreen preview"
@@ -156,7 +215,7 @@ export function PreviewPane({
       </div>
       <div className={`slideFrame ${slideModuleUrl ? "livePreviewFrame" : ""}`}>
         {slideModuleUrl ? (
-          <div className="embeddedPreviewFrame">
+          <div className="embeddedPreviewFrame" onDoubleClick={beginTextEdit}>
             {pages ? (
               <>
                 <SlideDeck
@@ -211,6 +270,32 @@ export function PreviewPane({
           </div>
         )}
       </div>
+      {textEdit ? (
+        <textarea
+          aria-label="Edit slide text"
+          autoFocus
+          className="inlineSlideEditor"
+          style={{
+            ...textEdit.style,
+            left: textEdit.left,
+            top: textEdit.top,
+            width: textEdit.width,
+            height: textEdit.height
+          }}
+          value={textEdit.value}
+          onBlur={commitTextEdit}
+          onChange={(event) => setTextEdit((current) => current ? { ...current, value: event.target.value } : current)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitTextEdit();
+            }
+            if (event.key === "Escape") {
+              setTextEdit(null);
+            }
+          }}
+        />
+      ) : null}
       {isFullscreen && pages ? (
         <div className="fullscreenPreview" role="dialog" aria-label="Fullscreen preview" aria-modal="true">
           <div className="fullscreenPreviewHeader">

@@ -63,6 +63,8 @@ type RenderableSlide = {
   content: string;
   layout: string;
   diagram?: DeckOutlineSlide["diagram"];
+  titleEditPath: string;
+  contentEditPath: string;
 };
 
 function kebabCase(value: string): string {
@@ -93,11 +95,25 @@ function normalizeSlides(slides: DeckOutlineSlide[]): DeckOutlineSlide[] {
 }
 
 function toRenderableSlides(slides: DeckOutlineSlide[]): RenderableSlide[] {
-  return normalizeSlides(slides).map((slide) => ({
+  return normalizeSlides(slides).map((slide, index) => ({
     title: slide.title,
     content: slide.content?.trim() ?? "",
     layout: slide.layout,
     diagram: slide.diagram
+      ? {
+          ...slide.diagram,
+          nodes: slide.diagram.nodes.map((node, nodeIndex) => ({
+            ...node,
+            labelEditPath: `slides.${index}.diagram.nodes.${nodeIndex}.label`,
+            sublabelEditPath: `slides.${index}.diagram.nodes.${nodeIndex}.sublabel`,
+            itemEditPaths: node.items?.map(
+              (_item, itemIndex) => `slides.${index}.diagram.nodes.${nodeIndex}.items.${itemIndex}`
+            )
+          }))
+        }
+      : undefined,
+    titleEditPath: `slides.${index}.title`,
+    contentEditPath: `slides.${index}.content`
   }));
 }
 
@@ -179,9 +195,12 @@ import pages from "../slides/${slideDirName}/index";
 
 import "./styles.css";
 
+const requestedSlide = Number(new URLSearchParams(window.location.search).get("slide"));
+const initialIndex = Number.isInteger(requestedSlide) && requestedSlide >= 0 ? requestedSlide : 0;
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <SlideDeck pages={pages} presentMode />
+    <SlideDeck initialIndex={initialIndex} pages={pages} presentMode />
   </StrictMode>
 );
 `;
@@ -232,9 +251,12 @@ const fonts = {
 type GeneratedDiagramNode = {
   id: string;
   label: string;
+  labelEditPath?: string;
   role?: "backend" | "external" | "focal" | "input" | "optional" | "store";
   sublabel?: string;
+  sublabelEditPath?: string;
   items?: string[];
+  itemEditPaths?: string[];
   lane?: string;
   level?: number;
   radius?: number;
@@ -274,7 +296,9 @@ type GeneratedDiagramSpec = {
 
 type GeneratedSlideSpec = {
   title: string;
+  titleEditPath: string;
   content: string;
+  contentEditPath: string;
   layout: string;
   diagram?: GeneratedDiagramSpec;
 };
@@ -430,6 +454,7 @@ function renderQuadrantItem(node: PositionedDiagramNode) {
         fontFamily={fonts.body}
         fontSize="22"
         fontWeight={node.role === "focal" ? "700" : "500"}
+        data-idris-edit-path={node.labelEditPath}
       >
         {node.label}
       </text>
@@ -441,6 +466,7 @@ function renderQuadrantItem(node: PositionedDiagramNode) {
           fill={colors.silver}
           fontFamily={fonts.body}
           fontSize="16"
+          data-idris-edit-path={node.sublabelEditPath}
         >
           {node.sublabel}
         </text>
@@ -542,7 +568,7 @@ function renderStateDiagram(nodes: PositionedDiagramNode[], connections: Diagram
       {stateNodes.map((node) => (
         <g key={node.id}>
           <rect x={node.x - 84} y={node.y - 38} width="168" height="76" rx="10" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
-          <text x={node.x} y={node.y + 6} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700">
+          <text x={node.x} y={node.y + 6} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700" data-idris-edit-path={node.labelEditPath}>
             {node.label}
           </text>
         </g>
@@ -579,11 +605,11 @@ function renderErDiagram(nodes: PositionedDiagramNode[], connections: DiagramCon
         <g key={node.id}>
           <rect x={node.x - 96} y={node.y - 64} width="192" height="128" rx="8" fill={colors.air} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
           <rect x={node.x - 96} y={node.y - 64} width="192" height="36" rx="8" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
-          <text x={node.x} y={node.y - 40} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="18" fontWeight="700">
+          <text x={node.x} y={node.y - 40} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="18" fontWeight="700" data-idris-edit-path={node.labelEditPath}>
             {node.label}
           </text>
           {(node.items ?? []).slice(0, 4).map((item, index) => (
-            <text key={item} x={node.x - 78} y={node.y - 4 + index * 22} fill={colors.onyx} fontFamily={fonts.body} fontSize="15">
+            <text key={item} x={node.x - 78} y={node.y - 4 + index * 22} fill={colors.onyx} fontFamily={fonts.body} fontSize="15" data-idris-edit-path={node.itemEditPaths?.[index]}>
               {item}
             </text>
           ))}
@@ -627,7 +653,7 @@ function renderSwimlaneDiagram(nodes: PositionedDiagramNode[], connections: Diag
       {stepNodes.map((node) => (
         <g key={node.id}>
           <rect x={node.x - 70} y={node.y - 30} width="140" height="60" rx="8" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.2" />
-          <text x={node.x} y={node.y + 6} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="17" fontWeight="700">
+          <text x={node.x} y={node.y + 6} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="17" fontWeight="700" data-idris-edit-path={node.labelEditPath}>
             {node.label}
           </text>
         </g>
@@ -645,7 +671,7 @@ function renderNestedDiagram(nodes: PositionedDiagramNode[]) {
           <g key={node.id}>
             <rect x={inset} y={92 + index * 28} width={1000 - inset * 2} height={440 - index * 56} rx="12" fill={node.role === "focal" ? "rgba(255,55,94,0.08)" : "rgba(29,37,45,0.02)"} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
             <rect x={inset + 20} y={84 + index * 28} width={Math.max(112, node.label.length * 10)} height="24" fill={colors.air} />
-            <text x={inset + 28} y={102 + index * 28} fill={nodeStroke(node.role)} fontFamily={fonts.body} fontSize="15" fontWeight="700">
+            <text x={inset + 28} y={102 + index * 28} fill={nodeStroke(node.role)} fontFamily={fonts.body} fontSize="15" fontWeight="700" data-idris-edit-path={node.labelEditPath}>
               {node.label.toUpperCase()}
             </text>
           </g>
@@ -677,7 +703,7 @@ function renderTreeDiagram(nodes: PositionedDiagramNode[], connections: DiagramC
       {treeNodes.map((node) => (
         <g key={node.id}>
           <rect x={node.x - 72} y={node.y - 30} width="144" height="60" rx="8" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.2" />
-          <text x={node.x} y={node.y + 5} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="18" fontWeight="700">
+          <text x={node.x} y={node.y + 5} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="18" fontWeight="700" data-idris-edit-path={node.labelEditPath}>
             {node.label}
           </text>
         </g>
@@ -694,10 +720,10 @@ function renderLayersDiagram(nodes: PositionedDiagramNode[]) {
         return (
           <g key={node.id}>
             <rect x="108" y={y} width="784" height="72" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.2" />
-            <text x="136" y={y + 43} fill={colors.silver} fontFamily={fonts.body} fontSize="15" fontWeight="700">
+            <text x="136" y={y + 43} fill={colors.silver} fontFamily={fonts.body} fontSize="15" fontWeight="700" data-idris-edit-path={node.sublabelEditPath}>
               {node.sublabel ?? "L" + String(index + 1)}
             </text>
-            <text x="300" y={y + 43} fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700">
+            <text x="300" y={y + 43} fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700" data-idris-edit-path={node.labelEditPath}>
               {node.label}
             </text>
           </g>
@@ -726,7 +752,7 @@ function renderVennDiagram(nodes: PositionedDiagramNode[], connections: DiagramC
         return (
           <g key={node.id}>
             <circle cx={cx} cy={cy} r={radius} fill={node.role === "focal" ? "rgba(255,55,94,0.10)" : "rgba(29,37,45,0.04)"} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
-            <text x={cx} y={cy - radius - 20} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700">
+            <text x={cx} y={cy - radius - 20} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700" data-idris-edit-path={node.labelEditPath}>
               {node.label}
             </text>
           </g>
@@ -817,6 +843,7 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
                   fontFamily={fonts.body}
                   fontSize="28"
                   fontWeight="700"
+                  data-idris-edit-path={node.labelEditPath}
                 >
                   {node.label}
                 </text>
@@ -897,6 +924,7 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
                 fontFamily={fonts.body}
                 fontSize="22"
                 fontWeight="700"
+                data-idris-edit-path={node.labelEditPath}
               >
                 {node.label}
               </text>
@@ -908,6 +936,7 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
                   fill={colors.silver}
                   fontFamily={fonts.body}
                   fontSize="16"
+                  data-idris-edit-path={node.sublabelEditPath}
                 >
                   {node.sublabel}
                 </text>
@@ -933,9 +962,9 @@ function DiagramSlide({ index, slide }: { index: number; slide: (typeof slideSpe
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <p style={{ color: colors.purple, fontSize: 24, margin: "0 0 18px" }}>{slide.layout}</p>
-          <h2 style={{ fontSize: 64, lineHeight: 1.02, margin: 0, maxWidth: 1200 }}>{slide.title}</h2>
+          <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 64, lineHeight: 1.02, margin: 0, maxWidth: 1200 }}>{slide.title}</h2>
           {slide.content ? (
-            <p style={{ color: colors.onyx, fontSize: 26, lineHeight: 1.28, margin: "22px 0 0", maxWidth: 1180 }}>
+            <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.onyx, fontSize: 26, lineHeight: 1.28, margin: "22px 0 0", maxWidth: 1180 }}>
               {slide.content}
             </p>
           ) : null}
@@ -968,8 +997,8 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
         <BrandMark />
         <div>
           <p style={{ fontSize: 30, margin: "0 0 28px", color: colors.sunlight }}>Solutions deck</p>
-          <h1 style={{ fontSize: 112, lineHeight: 1, margin: 0, maxWidth: 1320 }}>{slide.title}</h1>
-          <p style={{ fontSize: 38, lineHeight: 1.28, margin: "44px 0 0", maxWidth: 1180 }}>
+          <h1 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 112, lineHeight: 1, margin: 0, maxWidth: 1320 }}>{slide.title}</h1>
+          <p data-idris-edit-path={slide.contentEditPath} style={{ fontSize: 38, lineHeight: 1.28, margin: "44px 0 0", maxWidth: 1180 }}>
             {slide.content}
           </p>
         </div>
@@ -986,7 +1015,7 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
       <main style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 72, alignItems: "center" }}>
         <div>
           <p style={{ color: colors.purple, fontSize: 28, margin: "0 0 28px" }}>{slide.layout}</p>
-          <h2 style={{ fontSize: 82, lineHeight: 1.04, margin: 0 }}>{slide.title}</h2>
+          <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 82, lineHeight: 1.04, margin: 0 }}>{slide.title}</h2>
         </div>
         <aside
           style={{
@@ -1002,7 +1031,7 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
           }}
         >
           <p style={{ color: colors.sunlight, fontSize: 26, margin: 0 }}>{slide.layout}</p>
-          <p style={{ color: colors.air, fontSize: 34, lineHeight: 1.28, margin: 0 }}>{slide.content}</p>
+          <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.air, fontSize: 34, lineHeight: 1.28, margin: 0 }}>{slide.content}</p>
         </aside>
       </main>
       <footer style={{ display: "flex", justifyContent: "space-between", color: colors.silver, fontSize: 22 }}>

@@ -13,6 +13,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { PreviewPane } from "./components/PreviewPane";
 import type { ProjectMetadata } from "@idris-slides/project";
 import type { AppSettings, ChatMessage, DeckOutline } from "../shared/types";
+import { applyOutlineTextEdit } from "./editPaths";
 import "./styles.css";
 
 const initialSettings: AppSettings = { hasGeminiApiKey: false };
@@ -242,7 +243,34 @@ export function App() {
     setMessages([]);
   }
 
-  async function exportProject(kind: "pdf" | "html"): Promise<void> {
+  async function saveTextEdit(path: string, value: string): Promise<void> {
+    if (!activeProject?.outline || !window.idrisSlides) {
+      return;
+    }
+
+    const outline = applyOutlineTextEdit(activeProject.outline, path, value);
+    setError(null);
+
+    try {
+      const project = await window.idrisSlides.saveDeckOutline(activeProject, outline);
+      updateActiveProject(project);
+      const session = await window.idrisSlides.startPreview(project);
+      setSlideModuleUrl(cacheBustSlideModuleUrl(session.slideModuleUrl));
+    } catch (caught) {
+      const detail = caught instanceof Error ? caught.message : "Unable to save slide edit.";
+      setError(detail);
+      setMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "system",
+          content: detail
+        }
+      ]);
+    }
+  }
+
+  async function exportProject(kind: "pdf" | "html" | "pptx"): Promise<void> {
     if (!activeProject || !window.idrisSlides) {
       return;
     }
@@ -393,6 +421,7 @@ export function App() {
               isExporting={isExporting}
               isPreviewing={isPreviewing}
               onExport={(kind) => void exportProject(kind)}
+              onTextEdit={(path, value) => void saveTextEdit(path, value)}
               slideModuleUrl={slideModuleUrl}
               project={activeProject}
             />

@@ -1,5 +1,10 @@
 import { relative, resolve } from "node:path";
-import { createProject, createProjectFromOutline, listProjects } from "@idris-slides/project";
+import {
+  applyDeckOutlineEdit,
+  createProject,
+  createProjectFromOutline,
+  listProjects
+} from "@idris-slides/project";
 import type { ProjectMetadata } from "@idris-slides/project";
 import type { DeckOutline } from "../shared/types";
 import { startProjectPreview } from "./preview-manager";
@@ -19,6 +24,14 @@ export async function createLocalDeckFromOutline(prompt: string, outline: DeckOu
 
 export async function listLocalProjects(): Promise<ProjectMetadata[]> {
   return listProjects(await getWorkspaceRoot());
+}
+
+export async function saveLocalDeckOutline(project: ProjectMetadata, outline: DeckOutline) {
+  return applyDeckOutlineEdit({
+    project: await assertLocalProject(project),
+    outline,
+    editPrompt: "Manual direct edit"
+  });
 }
 
 export async function assertLocalProject(project: ProjectMetadata): Promise<ProjectMetadata> {

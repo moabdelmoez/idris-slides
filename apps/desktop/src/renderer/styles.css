@@ -837,6 +837,21 @@ input::placeholder {
   color: var(--color-text);
 }
 
+.inlineSlideEditor {
+  position: fixed;
+  z-index: 40;
+  border: 2px solid var(--color-coral);
+  border-radius: 4px;
+  box-shadow: 0 14px 40px rgba(29, 37, 45, 0.18);
+  box-sizing: border-box;
+  caret-color: currentColor;
+  padding: 6px 8px;
+  outline: none;
+  overflow: auto;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
 .previewThumbs {
   display: flex;
   gap: var(--space-2);

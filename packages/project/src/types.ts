@@ -16,7 +16,7 @@ export type ProjectMetadata = {
 
 export type ProjectExport = {
   id: string;
-  kind: "pdf" | "html";
+  kind: "pdf" | "html" | "pptx";
   path: string;
   createdAt: string;
 };

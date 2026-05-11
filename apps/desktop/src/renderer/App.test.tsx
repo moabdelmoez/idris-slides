@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { IdrisSlidesApi } from "../preload/preload";
@@ -46,6 +47,19 @@ describe("App", () => {
           ]
         }
       }),
+      saveDeckOutline: vi.fn().mockImplementation((_project, outline) =>
+        Promise.resolve({
+          id: "project-1",
+          name: outline.title,
+          createdAt: "2026-05-06T00:00:00.000Z",
+          updatedAt: "2026-05-06T00:03:00.000Z",
+          deckPath: "/tmp/idris/project-1/deck",
+          exports: [],
+          sourcePrompt: "Create a 5 slide deck about market expansion",
+          slideCount: outline.slides.length,
+          outline
+        })
+      ),
       startPreview: vi.fn().mockResolvedValue({
         projectId: "project-1",
         url: "http://127.0.0.1:5317",
@@ -61,8 +75,8 @@ describe("App", () => {
         exports: [
           {
             id: "export-1",
-            kind: "html",
-            path: "/tmp/idris/project-1/exports/html",
+            kind: "pptx",
+            path: "/tmp/idris/project-1/exports/deck.pptx",
             createdAt: "2026-05-06T00:02:00.000Z"
           }
         ],
@@ -154,12 +168,16 @@ describe("App", () => {
     expect(await screen.findByText("Deck preview loaded.")).toBeInTheDocument();
     expect(screen.queryByTitle("Live deck preview")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Export HTML" }));
+    expect(screen.getByRole("button", { name: "Export PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export PowerPoint" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Export HTML" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Export PowerPoint" }));
 
     await waitFor(() => {
       expect(window.idrisSlides?.exportProject).toHaveBeenCalledWith(
         expect.objectContaining({ id: "project-1" }),
-        "html"
+        "pptx"
       );
     });
 
@@ -331,6 +349,91 @@ describe("App", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Fullscreen preview" })).not.toBeInTheDocument();
+  });
+
+  it("commits direct text edits from the preview into the deck outline", async () => {
+    window.React = React;
+    window.idrisSlides = {
+      ...(window.idrisSlides as IdrisSlidesApi),
+      createDeckFromOutline: vi.fn().mockResolvedValue({
+        id: "project-1",
+        name: "Market Expansion",
+        createdAt: "2026-05-06T00:00:00.000Z",
+        updatedAt: "2026-05-06T00:00:00.000Z",
+        deckPath: "/tmp/idris/project-1/deck",
+        exports: [],
+        sourcePrompt: "Create a 1 slide deck",
+        slideCount: 1,
+        outline: {
+          title: "Market Expansion",
+          summary: "A branded outline for expansion planning.",
+          slides: [
+            {
+              title: "Opportunity",
+              content: "Priority markets create a clear expansion path.",
+              goal: "Frame the growth opportunity.",
+              layout: "Title slide",
+              visualDirection: "Use purple background with coral emphasis."
+            }
+          ]
+        }
+      }),
+      startPreview: vi.fn().mockResolvedValue({
+        projectId: "project-1",
+        url: "http://127.0.0.1:5317",
+        slideModuleUrl:
+          "data:text/javascript,export%20default%20%5Bfunction%20Slide()%20%7B%20return%20window.React.createElement(%22h1%22%2C%20%7B%22data-idris-edit-path%22%3A%22slides.0.title%22%2C%20style%3A%20%7Bcolor%3A%20%22rgb(255%2C%20255%2C%20255)%22%2C%20fontSize%3A%20%2232px%22%2C%20lineHeight%3A%20%221.3%22%7D%7D%2C%20%22Opportunity%22)%3B%20%7D%5D%3B"
+      })
+    };
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Gemini API key"), {
+      target: { value: "test-key" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save API Key" }));
+
+    await waitFor(() => {
+      expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
+    });
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Create a 1 slide deck" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve outline" }));
+
+    await screen.findByText("Deck preview loaded.");
+    const editableTitle = document.querySelector("[data-idris-edit-path='slides.0.title']") as HTMLElement;
+    expect(editableTitle).toBeInstanceOf(HTMLElement);
+    fireEvent.doubleClick(editableTitle);
+
+    const inlineEditor = screen.getByLabelText("Edit slide text");
+    expect(inlineEditor.tagName).toBe("TEXTAREA");
+    expect(inlineEditor).toHaveStyle({
+      color: "rgb(255, 255, 255)",
+      fontSize: "32px",
+      lineHeight: "1.3"
+    });
+    fireEvent.change(inlineEditor, { target: { value: "Executive Opportunity" } });
+    fireEvent.keyDown(inlineEditor, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(window.idrisSlides?.saveDeckOutline).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "project-1" }),
+        expect.objectContaining({
+          slides: [
+            expect.objectContaining({
+              title: "Executive Opportunity"
+            })
+          ]
+        })
+      );
+    });
+    await waitFor(() => {
+      expect(window.idrisSlides?.startPreview).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("cache-busts the slide module after deck edits instead of relying on Vite page reloads", async () => {

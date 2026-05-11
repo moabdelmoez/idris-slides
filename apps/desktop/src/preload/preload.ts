@@ -7,8 +7,9 @@ export type IdrisSlidesApi = {
   createDeckFromOutline(prompt: string, outline: DeckOutline): Promise<ProjectMetadata>;
   listProjects(): Promise<ProjectMetadata[]>;
   editDeck(project: ProjectMetadata, prompt: string): Promise<ProjectMetadata>;
+  saveDeckOutline(project: ProjectMetadata, outline: DeckOutline): Promise<ProjectMetadata>;
   startPreview(project: ProjectMetadata): Promise<PreviewSessionInfo>;
-  exportProject(project: ProjectMetadata, kind: "pdf" | "html"): Promise<ProjectMetadata>;
+  exportProject(project: ProjectMetadata, kind: "pdf" | "html" | "pptx"): Promise<ProjectMetadata>;
   getSettings(): Promise<AppSettings>;
   chooseWorkspaceRoot(): Promise<AppSettings>;
   saveGeminiApiKey(apiKey: string): Promise<AppSettings>;
@@ -27,6 +28,9 @@ const api: IdrisSlidesApi = {
   },
   editDeck(project, prompt) {
     return ipcRenderer.invoke("projects:editDeck", project, prompt) as Promise<ProjectMetadata>;
+  },
+  saveDeckOutline(project, outline) {
+    return ipcRenderer.invoke("projects:saveDeckOutline", project, outline) as Promise<ProjectMetadata>;
   },
   startPreview(project) {
     return ipcRenderer.invoke("projects:startPreview", project) as Promise<PreviewSessionInfo>;

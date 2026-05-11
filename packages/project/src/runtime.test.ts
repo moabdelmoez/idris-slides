@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  applyDeckOutlineEdit,
   createProjectFromOutline,
   exportDeckToHtml,
   installDeckDependencies,
@@ -118,6 +119,93 @@ describe("Idris deck runtime orchestration", () => {
     expect(project.sourcePrompt).toBe("Create a deck about market expansion");
     expect(project.slideCount).toBe(2);
     expect(project.slideDirName).toBe("market-expansion");
+  });
+
+  it("emits edit metadata for user-authored slide fields", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create an editable diagram deck",
+      outline: {
+        title: "Editable Deck",
+        summary: "A deck with editable fields.",
+        slides: [
+          {
+            title: "Editable Title",
+            content: "Editable body copy.",
+            goal: "Show editable fields.",
+            layout: "Quadrant diagram",
+            visualDirection: "Use a quadrant.",
+            diagram: {
+              type: "quadrant",
+              nodes: [
+                {
+                  id: "focus",
+                  label: "Editable Node",
+                  sublabel: "Editable sublabel",
+                  items: ["Editable item"],
+                  role: "focal"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    });
+
+    const slideFile = await readFile(join(project.deckPath, "slides", "editable-deck", "index.tsx"), "utf8");
+
+    expect(slideFile).toContain("data-idris-edit-path");
+    expect(slideFile).toContain('"titleEditPath": "slides.0.title"');
+    expect(slideFile).toContain('"contentEditPath": "slides.0.content"');
+    expect(slideFile).toContain('"labelEditPath": "slides.0.diagram.nodes.0.label"');
+    expect(slideFile).toContain('"sublabelEditPath": "slides.0.diagram.nodes.0.sublabel"');
+    expect(slideFile).toContain('"slides.0.diagram.nodes.0.items.0"');
+    expect(slideFile).not.toContain("visualDirection");
+  });
+
+  it("updates generated slides from a saved outline without Gemini", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create an editable deck",
+      outline: {
+        title: "Editable Deck",
+        summary: "A deck with editable fields.",
+        slides: [
+          {
+            title: "Original Title",
+            content: "Editable body copy.",
+            goal: "Show editable fields.",
+            layout: "Title slide",
+            visualDirection: "Use purple."
+          }
+        ]
+      }
+    });
+
+    const originalSlide = project.outline!.slides[0]!;
+    const updated = await applyDeckOutlineEdit({
+      project,
+      editPrompt: "Manual direct edit",
+      outline: {
+        ...project.outline!,
+        slides: [
+          {
+            ...originalSlide,
+            title: "Updated Title"
+          }
+        ]
+      }
+    });
+
+    const slideFile = await readFile(join(project.deckPath, "slides", "editable-deck", "index.tsx"), "utf8");
+
+    expect(updated.outline?.slides[0]?.title).toBe("Updated Title");
+    expect(slideFile).toContain("Updated Title");
+    expect(slideFile).not.toContain("Original Title");
   });
 
   it("does not add an extra title page beyond the approved outline slides", async () => {

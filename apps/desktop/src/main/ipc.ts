@@ -6,6 +6,7 @@ import {
   createLocalDeckFromOutline,
   createLocalProject,
   listLocalProjects,
+  saveLocalDeckOutline,
   startLocalPreview
 } from "./project-handlers";
 import { chooseWorkspaceRoot, getSettings, saveGeminiApiKey } from "./settings-handlers";
@@ -27,11 +28,15 @@ export function registerIpcHandlers(): void {
     return editDeck(await assertLocalProject(project), prompt);
   });
 
+  ipcMain.handle("projects:saveDeckOutline", async (_event, project, outline) => {
+    return saveLocalDeckOutline(project, outline);
+  });
+
   ipcMain.handle("projects:startPreview", async (_event, project) => {
     return startLocalPreview(project);
   });
 
-  ipcMain.handle("projects:export", async (_event, project, kind: "pdf" | "html") => {
+  ipcMain.handle("projects:export", async (_event, project, kind: "pdf" | "html" | "pptx") => {
     return exportProject(await assertLocalProject(project), kind);
   });
 
