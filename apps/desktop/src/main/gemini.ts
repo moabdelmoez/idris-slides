@@ -30,7 +30,50 @@ const outlineSchema = {
           content: { type: "STRING" },
           goal: { type: "STRING" },
           layout: { type: "STRING" },
-          visualDirection: { type: "STRING" }
+          visualDirection: { type: "STRING" },
+          diagram: {
+            type: "OBJECT",
+            nullable: true,
+            properties: {
+              type: {
+                type: "STRING",
+                enum: ["architecture", "flowchart", "timeline", "quadrant", "pyramid"]
+              },
+              nodes: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    id: { type: "STRING" },
+                    label: { type: "STRING" },
+                    role: {
+                      type: "STRING",
+                      enum: ["backend", "external", "focal", "input", "optional", "store"]
+                    },
+                    sublabel: { type: "STRING" }
+                  },
+                  required: ["id", "label"]
+                }
+              },
+              connections: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    from: { type: "STRING" },
+                    to: { type: "STRING" },
+                    label: { type: "STRING" },
+                    tone: {
+                      type: "STRING",
+                      enum: ["accent", "default", "link"]
+                    }
+                  },
+                  required: ["from", "to"]
+                }
+              }
+            },
+            required: ["type", "nodes"]
+          }
         },
         required: ["title", "content", "goal", "layout", "visualDirection"]
       }
@@ -47,10 +90,15 @@ function buildOutlinePrompt(prompt: string): string {
     "If the user asks for one slide, return a single slide object that contains the requested content.",
     "For each slide, content is the only audience-facing body copy that may appear on the slide.",
     "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
+    "When a slide should be a diagram, set layout to a diagram layout and include a diagram object.",
+    "Supported diagram types: architecture, flowchart, timeline, quadrant, pyramid.",
+    "Diagram nodes must be concise. Use at most 9 nodes and at most 12 connections.",
+    "Use role focal for only 1 or 2 nodes. Use connection tone accent for only the primary relationship.",
+    "If the requested diagram is too complex, split it across multiple diagram slides.",
     "Return concise, practical slide direction only.",
     "Use only approved brand language and visual direction.",
     "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
-    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide.",
+    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide, Architecture diagram, Flowchart diagram, Timeline diagram, Quadrant diagram, Pyramid diagram.",
     "",
     `User prompt: ${prompt}`
   ].join("\n");
@@ -65,8 +113,10 @@ function buildEditPrompt(project: ProjectMetadata, editPrompt: string): string {
     "For each slide, content is the only audience-facing body copy that may appear on the slide.",
     "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
     "Preserve approved brand direction and use only approved layouts/colors.",
+    "When revising a diagram slide, return the full updated diagram object. Keep diagrams within 9 nodes and 12 connections.",
+    "Supported diagram types: architecture, flowchart, timeline, quadrant, pyramid.",
     "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
-    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide.",
+    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide, Architecture diagram, Flowchart diagram, Timeline diagram, Quadrant diagram, Pyramid diagram.",
     "",
     `Current project: ${JSON.stringify(
       {

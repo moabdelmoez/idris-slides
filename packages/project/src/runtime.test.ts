@@ -151,6 +151,126 @@ describe("Idris deck runtime orchestration", () => {
     expect(slideFile).toContain("...slideSpecs.map");
   });
 
+  it("creates a native diagram slide from a diagram outline spec", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create one architecture diagram slide for a client reporting system",
+      outline: {
+        title: "Reporting Architecture",
+        summary: "A single architecture diagram for the reporting system.",
+        slides: [
+          {
+            title: "Client Reporting Flow",
+            content: "Requests move from client workspace to API, store, and executive dashboard.",
+            goal: "Show the reporting system components.",
+            layout: "Architecture diagram",
+            visualDirection: "Use a native diagram slide with one focal API node.",
+            diagram: {
+              type: "architecture",
+              nodes: [
+                { id: "client", label: "Client Workspace", role: "input" },
+                { id: "api", label: "Reporting API", role: "focal", sublabel: "REST" },
+                { id: "store", label: "Report Store", role: "store" },
+                { id: "dashboard", label: "Exec Dashboard", role: "backend" }
+              ],
+              connections: [
+                { from: "client", to: "api", label: "REQUEST" },
+                { from: "api", to: "store", label: "READ" },
+                { from: "api", to: "dashboard", label: "RENDER", tone: "accent" }
+              ]
+            }
+          }
+        ]
+      }
+    });
+
+    const slideFile = await readFile(
+      join(project.deckPath, "slides", "reporting-architecture", "index.tsx"),
+      "utf8"
+    );
+
+    expect(slideFile).toContain("function DiagramSlide");
+    expect(slideFile).toContain("Client Reporting Flow");
+    expect(slideFile).toContain("Reporting API");
+    expect(slideFile).toContain("REQUEST");
+    expect(slideFile).toContain("markerEnd");
+    expect(slideFile).toContain("#ff375e");
+    expect(slideFile).not.toContain("Use a native diagram slide");
+  });
+
+  it("recognizes the initial supported diagram types in generated slide data", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+    const supportedTypes = ["architecture", "flowchart", "timeline", "quadrant", "pyramid"] as const;
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create diagram slides for supported types",
+      outline: {
+        title: "Diagram Types",
+        summary: "A deck of supported diagram types.",
+        slides: supportedTypes.map((type) => ({
+          title: `${type} view`,
+          content: `${type} content`,
+          goal: `Show ${type}.`,
+          layout: `${type} diagram`,
+          visualDirection: "Render as native diagram.",
+          diagram: {
+            type,
+            nodes: [
+              { id: "a", label: "Start", role: "input" },
+              { id: "b", label: "End", role: "focal" }
+            ],
+            connections: [{ from: "a", to: "b", label: "NEXT" }]
+          }
+        }))
+      }
+    });
+
+    const slideFile = await readFile(join(project.deckPath, "slides", "diagram-types", "index.tsx"), "utf8");
+
+    for (const type of supportedTypes) {
+      expect(slideFile).toContain(`"type": "${type}"`);
+    }
+    expect(slideFile).toContain("renderDiagram");
+  });
+
+  it("renders quadrant items as dot labels instead of boxed nodes", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create a quadrant diagram for impact and effort",
+      outline: {
+        title: "Impact Effort",
+        summary: "A quadrant diagram.",
+        slides: [
+          {
+            title: "Content Ideas",
+            content: "Prioritize content ideas by impact and effort.",
+            goal: "Show quadrant item placement.",
+            layout: "Quadrant diagram",
+            visualDirection: "Render quadrant items as dot labels.",
+            diagram: {
+              type: "quadrant",
+              nodes: [
+                { id: "schematic", label: "Schematic skill v4", role: "focal" },
+                { id: "refresh", label: "Design v4 refresh", role: "backend" }
+              ]
+            }
+          }
+        ]
+      }
+    });
+
+    const slideFile = await readFile(join(project.deckPath, "slides", "impact-effort", "index.tsx"), "utf8");
+
+    expect(slideFile).toContain("function renderQuadrantItem");
+    expect(slideFile).toContain('diagram.type === "quadrant"');
+    expect(slideFile).toContain('diagram.type !== "pyramid" && diagram.type !== "quadrant"');
+  });
+
   it("repairs generated deck runtime package paths without rewriting slides", async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
 

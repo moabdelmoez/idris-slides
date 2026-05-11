@@ -62,6 +62,7 @@ type RenderableSlide = {
   title: string;
   content: string;
   layout: string;
+  diagram?: DeckOutlineSlide["diagram"];
 };
 
 function kebabCase(value: string): string {
@@ -95,7 +96,8 @@ function toRenderableSlides(slides: DeckOutlineSlide[]): RenderableSlide[] {
   return normalizeSlides(slides).map((slide) => ({
     title: slide.title,
     content: slide.content?.trim() ?? "",
-    layout: slide.layout
+    layout: slide.layout,
+    diagram: slide.diagram
   }));
 }
 
@@ -227,7 +229,34 @@ const fonts = {
   body: '"STCForward", "STC Forward", Arial, sans-serif'
 } as const;
 
-const slideSpecs = ${JSON.stringify(slides, null, 2)} as const;
+type GeneratedDiagramNode = {
+  id: string;
+  label: string;
+  role?: "backend" | "external" | "focal" | "input" | "optional" | "store";
+  sublabel?: string;
+};
+
+type GeneratedDiagramConnection = {
+  from: string;
+  to: string;
+  label?: string;
+  tone?: "accent" | "default" | "link";
+};
+
+type GeneratedDiagramSpec = {
+  type: "architecture" | "flowchart" | "timeline" | "quadrant" | "pyramid";
+  nodes: GeneratedDiagramNode[];
+  connections?: GeneratedDiagramConnection[];
+};
+
+type GeneratedSlideSpec = {
+  title: string;
+  content: string;
+  layout: string;
+  diagram?: GeneratedDiagramSpec;
+};
+
+const slideSpecs = ${JSON.stringify(slides, null, 2)} as const satisfies readonly GeneratedSlideSpec[];
 
 const shell: CSSProperties = {
   width: "100%",
@@ -254,7 +283,346 @@ function BrandMark() {
   );
 }
 
+type DiagramNode = GeneratedDiagramNode;
+type DiagramConnection = GeneratedDiagramConnection;
+type PositionedDiagramNode = DiagramNode & { x: number; y: number };
+
+function nodeFill(role: DiagramNode["role"]): string {
+  if (role === "focal") {
+    return "rgba(255, 55, 94, 0.08)";
+  }
+
+  if (role === "store") {
+    return "rgba(29, 37, 45, 0.05)";
+  }
+
+  if (role === "input") {
+    return "rgba(142, 154, 160, 0.14)";
+  }
+
+  return colors.air;
+}
+
+function nodeStroke(role: DiagramNode["role"]): string {
+  if (role === "focal") {
+    return colors.coral;
+  }
+
+  if (role === "store" || role === "input") {
+    return colors.silver;
+  }
+
+  return colors.onyx;
+}
+
+function connectionStroke(tone: DiagramConnection["tone"]): string {
+  if (tone === "accent") {
+    return colors.coral;
+  }
+
+  if (tone === "link") {
+    return colors.sea;
+  }
+
+  return colors.silver;
+}
+
+function markerFor(tone: DiagramConnection["tone"]): string {
+  if (tone === "accent") {
+    return "url(#arrow-accent)";
+  }
+
+  if (tone === "link") {
+    return "url(#arrow-link)";
+  }
+
+  return "url(#arrow)";
+}
+
+function layoutDiagramNodes(diagram: GeneratedDiagramSpec): PositionedDiagramNode[] {
+  const nodes = diagram.nodes.slice(0, 9);
+
+  if (diagram.type === "flowchart" || diagram.type === "pyramid") {
+    return nodes.map((node, index) => ({
+      ...node,
+      x: 520,
+      y: 132 + index * 112
+    }));
+  }
+
+  if (diagram.type === "timeline") {
+    const gap = nodes.length > 1 ? 840 / (nodes.length - 1) : 0;
+    return nodes.map((node, index) => ({
+      ...node,
+      x: 100 + gap * index,
+      y: index % 2 === 0 ? 220 : 360
+    }));
+  }
+
+  if (diagram.type === "quadrant") {
+    const points = [
+      [272, 204],
+      [728, 204],
+      [272, 440],
+      [728, 440],
+      [500, 320],
+      [380, 252],
+      [620, 388],
+      [380, 388],
+      [620, 252]
+    ];
+
+    return nodes.map((node, index) => ({
+      ...node,
+      x: points[index]?.[0] ?? 500,
+      y: points[index]?.[1] ?? 320
+    }));
+  }
+
+  const rows = nodes.length <= 3 ? 1 : nodes.length <= 6 ? 2 : 3;
+  const columns = Math.ceil(nodes.length / rows);
+  const xGap = columns > 1 ? 720 / (columns - 1) : 0;
+  const yGap = rows > 1 ? 280 / (rows - 1) : 0;
+
+  return nodes.map((node, index) => ({
+    ...node,
+    x: 140 + (index % columns) * xGap,
+    y: 180 + Math.floor(index / columns) * yGap
+  }));
+}
+
+function renderQuadrantItem(node: PositionedDiagramNode) {
+  const fill = node.role === "focal" ? colors.coral : colors.onyx;
+  const labelAnchor = node.x > 760 ? "end" : "start";
+  const labelX = node.x > 760 ? node.x - 18 : node.x + 18;
+
+  return (
+    <g key={node.id}>
+      <circle cx={node.x} cy={node.y} r="8" fill={fill} />
+      <text
+        x={labelX}
+        y={node.y + 5}
+        textAnchor={labelAnchor}
+        fill={colors.onyx}
+        fontFamily={fonts.body}
+        fontSize="22"
+        fontWeight={node.role === "focal" ? "700" : "500"}
+      >
+        {node.label}
+      </text>
+      {node.sublabel ? (
+        <text
+          x={labelX}
+          y={node.y + 30}
+          textAnchor={labelAnchor}
+          fill={colors.silver}
+          fontFamily={fonts.body}
+          fontSize="16"
+        >
+          {node.sublabel}
+        </text>
+      ) : null}
+    </g>
+  );
+}
+
+function renderDiagram(diagram: GeneratedDiagramSpec) {
+  const nodes = layoutDiagramNodes(diagram);
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const connections = (diagram.connections ?? []).slice(0, 12);
+
+  return (
+    <svg
+      aria-label={diagram.type + " diagram"}
+      role="img"
+      viewBox="0 0 1000 620"
+      style={{ width: "100%", height: "100%", display: "block" }}
+    >
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill={colors.silver} />
+        </marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill={colors.coral} />
+        </marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill={colors.sea} />
+        </marker>
+      </defs>
+      <rect width="100%" height="100%" fill={colors.air} />
+      {diagram.type === "quadrant" ? (
+        <>
+          <line x1="500" y1="112" x2="500" y2="520" stroke={colors.silver} strokeWidth="1.2" />
+          <line x1="92" y1="316" x2="908" y2="316" stroke={colors.silver} strokeWidth="1.2" />
+          <text x="500" y="92" textAnchor="middle" fill={colors.silver} fontFamily={fonts.body} fontSize="18">
+            Higher impact
+          </text>
+          <text x="500" y="568" textAnchor="middle" fill={colors.silver} fontFamily={fonts.body} fontSize="18">
+            Lower impact
+          </text>
+        </>
+      ) : null}
+      {diagram.type === "timeline" ? (
+        <line x1="92" y1="316" x2="908" y2="316" stroke={colors.silver} strokeWidth="1.2" />
+      ) : null}
+      {diagram.type === "pyramid"
+        ? nodes.map((node, index) => {
+            const width = 680 - index * 96;
+            const x = 500 - width / 2;
+            return (
+              <g key={node.id}>
+                <rect
+                  x={x}
+                  y={node.y - 42}
+                  width={width}
+                  height="84"
+                  fill={nodeFill(node.role)}
+                  stroke={nodeStroke(node.role)}
+                  strokeWidth="1"
+                />
+                <text
+                  x="500"
+                  y={node.y + 4}
+                  textAnchor="middle"
+                  fill={colors.onyx}
+                  fontFamily={fonts.body}
+                  fontSize="28"
+                  fontWeight="700"
+                >
+                  {node.label}
+                </text>
+              </g>
+            );
+          })
+        : diagram.type === "quadrant"
+          ? null
+        : connections.map((connection) => {
+            const from = nodeById.get(connection.from);
+            const to = nodeById.get(connection.to);
+
+            if (!from || !to) {
+              return null;
+            }
+
+            const midX = (from.x + to.x) / 2;
+            const midY = (from.y + to.y) / 2;
+            const stroke = connectionStroke(connection.tone);
+
+            return (
+              <g key={connection.from + "-" + connection.to + "-" + (connection.label ?? "")}>
+                <line
+                  x1={from.x}
+                  y1={from.y}
+                  x2={to.x}
+                  y2={to.y}
+                  stroke={stroke}
+                  strokeWidth="2"
+                  markerEnd={markerFor(connection.tone)}
+                />
+                {connection.label ? (
+                  <>
+                    <rect x={midX - 44} y={midY - 23} width="88" height="24" fill={colors.air} />
+                    <text
+                      x={midX}
+                      y={midY - 6}
+                      textAnchor="middle"
+                      fill={stroke}
+                      fontFamily={fonts.body}
+                      fontSize="16"
+                      fontWeight="700"
+                    >
+                      {connection.label.slice(0, 14).toUpperCase()}
+                    </text>
+                  </>
+                ) : null}
+              </g>
+            );
+          })}
+      {diagram.type === "quadrant" ? nodes.map((node) => renderQuadrantItem(node)) : null}
+      {diagram.type !== "pyramid" && diagram.type !== "quadrant"
+        ? nodes.map((node) => (
+            <g key={node.id}>
+              <rect
+                x={node.x - 92}
+                y={node.y - 44}
+                width="184"
+                height="88"
+                rx="8"
+                fill={colors.air}
+              />
+              <rect
+                x={node.x - 92}
+                y={node.y - 44}
+                width="184"
+                height="88"
+                rx="8"
+                fill={nodeFill(node.role)}
+                stroke={nodeStroke(node.role)}
+                strokeWidth="1.4"
+              />
+              <text
+                x={node.x}
+                y={node.y - (node.sublabel ? 3 : -6)}
+                textAnchor="middle"
+                fill={colors.onyx}
+                fontFamily={fonts.body}
+                fontSize="22"
+                fontWeight="700"
+              >
+                {node.label}
+              </text>
+              {node.sublabel ? (
+                <text
+                  x={node.x}
+                  y={node.y + 24}
+                  textAnchor="middle"
+                  fill={colors.silver}
+                  fontFamily={fonts.body}
+                  fontSize="16"
+                >
+                  {node.sublabel}
+                </text>
+              ) : null}
+            </g>
+          ))
+        : null}
+      <line x1="52" y1="568" x2="948" y2="568" stroke="rgba(29,37,45,0.14)" strokeWidth="1" />
+      <text x="52" y="596" fill={colors.silver} fontFamily={fonts.body} fontSize="16">
+        {diagram.type.toUpperCase()} - Native Idris diagram
+      </text>
+    </svg>
+  );
+}
+
+function DiagramSlide({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  if (!slide.diagram) {
+    return null;
+  }
+
+  return (
+    <section style={{ ...shell, padding: "72px 92px", gap: 34 }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <p style={{ color: colors.purple, fontSize: 24, margin: "0 0 18px" }}>{slide.layout}</p>
+          <h2 style={{ fontSize: 64, lineHeight: 1.02, margin: 0, maxWidth: 1200 }}>{slide.title}</h2>
+          {slide.content ? (
+            <p style={{ color: colors.onyx, fontSize: 26, lineHeight: 1.28, margin: "22px 0 0", maxWidth: 1180 }}>
+              {slide.content}
+            </p>
+          ) : null}
+        </div>
+        <span style={{ color: colors.silver, fontSize: 24 }}>{String(index + 1).padStart(2, "0")}</span>
+      </header>
+      <div style={{ flex: 1, minHeight: 0 }}>{renderDiagram(slide.diagram)}</div>
+    </section>
+  );
+}
+
 function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  if (slide.diagram) {
+    return <DiagramSlide index={index} slide={slide} />;
+  }
+
   const isTitleLayout = slide.layout.toLowerCase().includes("title");
 
   if (isTitleLayout) {
