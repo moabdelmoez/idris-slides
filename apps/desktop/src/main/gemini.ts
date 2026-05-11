@@ -37,7 +37,25 @@ const outlineSchema = {
             properties: {
               type: {
                 type: "STRING",
-                enum: ["architecture", "flowchart", "timeline", "quadrant", "pyramid"]
+                enum: [
+                  "architecture",
+                  "er",
+                  "flowchart",
+                  "layers",
+                  "nested",
+                  "pyramid",
+                  "quadrant",
+                  "sequence",
+                  "state",
+                  "swimlane",
+                  "timeline",
+                  "tree",
+                  "venn"
+                ]
+              },
+              variant: {
+                type: "STRING",
+                enum: ["consultant"]
               },
               nodes: {
                 type: "ARRAY",
@@ -50,7 +68,16 @@ const outlineSchema = {
                       type: "STRING",
                       enum: ["backend", "external", "focal", "input", "optional", "store"]
                     },
-                    sublabel: { type: "STRING" }
+                    sublabel: { type: "STRING" },
+                    items: {
+                      type: "ARRAY",
+                      items: { type: "STRING" }
+                    },
+                    lane: { type: "STRING" },
+                    level: { type: "NUMBER" },
+                    radius: { type: "NUMBER" },
+                    x: { type: "NUMBER" },
+                    y: { type: "NUMBER" }
                   },
                   required: ["id", "label"]
                 }
@@ -62,6 +89,12 @@ const outlineSchema = {
                   properties: {
                     from: { type: "STRING" },
                     to: { type: "STRING" },
+                    cardinalityFrom: { type: "STRING" },
+                    cardinalityTo: { type: "STRING" },
+                    kind: {
+                      type: "STRING",
+                      enum: ["call", "handoff", "relationship", "return", "self", "transition"]
+                    },
                     label: { type: "STRING" },
                     tone: {
                       type: "STRING",
@@ -91,14 +124,16 @@ function buildOutlinePrompt(prompt: string): string {
     "For each slide, content is the only audience-facing body copy that may appear on the slide.",
     "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
     "When a slide should be a diagram, set layout to a diagram layout and include a diagram object.",
-    "Supported diagram types: architecture, flowchart, timeline, quadrant, pyramid.",
+    "Supported diagram types: architecture, flowchart, sequence, state, er, timeline, swimlane, quadrant, nested, tree, layers, venn, pyramid.",
+    "If the user explicitly asks for a supported diagram type, use that exact diagram type. Do not substitute a nearby type.",
+    "Use variant consultant only for consultant-style quadrant diagrams.",
     "Diagram nodes must be concise. Use at most 9 nodes and at most 12 connections.",
     "Use role focal for only 1 or 2 nodes. Use connection tone accent for only the primary relationship.",
     "If the requested diagram is too complex, split it across multiple diagram slides.",
     "Return concise, practical slide direction only.",
     "Use only approved brand language and visual direction.",
     "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
-    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide, Architecture diagram, Flowchart diagram, Timeline diagram, Quadrant diagram, Pyramid diagram.",
+    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide, Architecture diagram, Flowchart diagram, Sequence diagram, State diagram, ER diagram, Swimlane diagram, Quadrant diagram, Nested diagram, Tree diagram, Layer stack diagram, Venn diagram, Pyramid diagram.",
     "",
     `User prompt: ${prompt}`
   ].join("\n");
@@ -114,9 +149,10 @@ function buildEditPrompt(project: ProjectMetadata, editPrompt: string): string {
     "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
     "Preserve approved brand direction and use only approved layouts/colors.",
     "When revising a diagram slide, return the full updated diagram object. Keep diagrams within 9 nodes and 12 connections.",
-    "Supported diagram types: architecture, flowchart, timeline, quadrant, pyramid.",
+    "Supported diagram types: architecture, flowchart, sequence, state, er, timeline, swimlane, quadrant, nested, tree, layers, venn, pyramid.",
+    "If the user explicitly asks for a supported diagram type, use that exact diagram type. Do not substitute a nearby type.",
     "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
-    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide, Architecture diagram, Flowchart diagram, Timeline diagram, Quadrant diagram, Pyramid diagram.",
+    "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide, Architecture diagram, Flowchart diagram, Sequence diagram, State diagram, ER diagram, Swimlane diagram, Quadrant diagram, Nested diagram, Tree diagram, Layer stack diagram, Venn diagram, Pyramid diagram.",
     "",
     `Current project: ${JSON.stringify(
       {

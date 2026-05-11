@@ -234,17 +234,40 @@ type GeneratedDiagramNode = {
   label: string;
   role?: "backend" | "external" | "focal" | "input" | "optional" | "store";
   sublabel?: string;
+  items?: string[];
+  lane?: string;
+  level?: number;
+  radius?: number;
+  x?: number;
+  y?: number;
 };
 
 type GeneratedDiagramConnection = {
   from: string;
   to: string;
+  cardinalityFrom?: string;
+  cardinalityTo?: string;
+  kind?: "call" | "handoff" | "relationship" | "return" | "self" | "transition";
   label?: string;
   tone?: "accent" | "default" | "link";
 };
 
 type GeneratedDiagramSpec = {
-  type: "architecture" | "flowchart" | "timeline" | "quadrant" | "pyramid";
+  type:
+    | "architecture"
+    | "er"
+    | "flowchart"
+    | "layers"
+    | "nested"
+    | "pyramid"
+    | "quadrant"
+    | "sequence"
+    | "state"
+    | "swimlane"
+    | "timeline"
+    | "tree"
+    | "venn";
+  variant?: "consultant";
   nodes: GeneratedDiagramNode[];
   connections?: GeneratedDiagramConnection[];
 };
@@ -426,6 +449,296 @@ function renderQuadrantItem(node: PositionedDiagramNode) {
   );
 }
 
+function isSpecializedDiagram(type: GeneratedDiagramSpec["type"]): boolean {
+  return (
+    type === "sequence" ||
+    type === "state" ||
+    type === "er" ||
+    type === "swimlane" ||
+    type === "nested" ||
+    type === "tree" ||
+    type === "layers" ||
+    type === "venn"
+  );
+}
+
+function renderSequenceDiagram(nodes: PositionedDiagramNode[], connections: DiagramConnection[]) {
+  const actors = nodes.slice(0, 5).map((node, index, all) => ({
+    ...node,
+    x: 120 + (all.length > 1 ? (760 / (all.length - 1)) * index : 380)
+  }));
+  const actorById = new Map(actors.map((node) => [node.id, node]));
+
+  return (
+    <>
+      {actors.map((actor) => (
+        <g key={actor.id}>
+          <rect x={actor.x - 72} y="76" width="144" height="48" rx="6" fill={nodeFill(actor.role)} stroke={nodeStroke(actor.role)} />
+          <text x={actor.x} y="107" textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="18" fontWeight="700">
+            {actor.label}
+          </text>
+          <line x1={actor.x} y1="124" x2={actor.x} y2="540" stroke={colors.silver} strokeWidth="1" strokeDasharray="5,5" />
+        </g>
+      ))}
+      {connections.slice(0, 12).map((connection, index) => {
+        const from = actorById.get(connection.from);
+        const to = actorById.get(connection.to);
+        if (!from || !to) {
+          return null;
+        }
+        const y = 176 + index * 44;
+        const stroke = connectionStroke(connection.tone);
+        return (
+          <g key={connection.from + connection.to + String(index)}>
+            <line
+              x1={from.x}
+              y1={y}
+              x2={to.x}
+              y2={y}
+              stroke={stroke}
+              strokeWidth="2"
+              strokeDasharray={connection.kind === "return" ? "6,5" : undefined}
+              markerEnd={markerFor(connection.tone)}
+            />
+            {connection.label ? (
+              <text x={(from.x + to.x) / 2} y={y - 10} textAnchor="middle" fill={stroke} fontFamily={fonts.body} fontSize="15" fontWeight="700">
+                {connection.label.slice(0, 18).toUpperCase()}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+function renderStateDiagram(nodes: PositionedDiagramNode[], connections: DiagramConnection[]) {
+  const stateNodes = nodes.slice(0, 8);
+  const nodeById = new Map(stateNodes.map((node) => [node.id, node]));
+
+  return (
+    <>
+      <circle cx="68" cy="316" r="10" fill={colors.onyx} />
+      <circle cx="932" cy="316" r="14" fill="none" stroke={colors.onyx} strokeWidth="2" />
+      <circle cx="932" cy="316" r="8" fill={colors.onyx} />
+      {connections.slice(0, 12).map((connection, index) => {
+        const from = nodeById.get(connection.from);
+        const to = nodeById.get(connection.to);
+        if (!from || !to) {
+          return null;
+        }
+        const stroke = connectionStroke(connection.tone);
+        return (
+          <g key={connection.from + connection.to + String(index)}>
+            <path d={"M " + from.x + " " + from.y + " C " + ((from.x + to.x) / 2) + " " + (from.y - 80) + ", " + ((from.x + to.x) / 2) + " " + (to.y - 80) + ", " + to.x + " " + to.y} fill="none" stroke={stroke} strokeWidth="2" markerEnd={markerFor(connection.tone)} />
+            {connection.label ? (
+              <text x={(from.x + to.x) / 2} y={Math.min(from.y, to.y) - 54} textAnchor="middle" fill={stroke} fontFamily={fonts.body} fontSize="15" fontWeight="700">
+                {connection.label.slice(0, 22)}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
+      {stateNodes.map((node) => (
+        <g key={node.id}>
+          <rect x={node.x - 84} y={node.y - 38} width="168" height="76" rx="10" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
+          <text x={node.x} y={node.y + 6} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700">
+            {node.label}
+          </text>
+        </g>
+      ))}
+    </>
+  );
+}
+
+function renderErDiagram(nodes: PositionedDiagramNode[], connections: DiagramConnection[]) {
+  const entities = nodes.slice(0, 8);
+  const nodeById = new Map(entities.map((node) => [node.id, node]));
+
+  return (
+    <>
+      {connections.slice(0, 12).map((connection, index) => {
+        const from = nodeById.get(connection.from);
+        const to = nodeById.get(connection.to);
+        if (!from || !to) {
+          return null;
+        }
+        return (
+          <g key={connection.from + connection.to + String(index)}>
+            <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={colors.silver} strokeWidth="1.4" />
+            <text x={(from.x * 3 + to.x) / 4} y={(from.y * 3 + to.y) / 4 - 10} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="15">
+              {connection.cardinalityFrom}
+            </text>
+            <text x={(from.x + to.x * 3) / 4} y={(from.y + to.y * 3) / 4 - 10} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="15">
+              {connection.cardinalityTo}
+            </text>
+          </g>
+        );
+      })}
+      {entities.map((node) => (
+        <g key={node.id}>
+          <rect x={node.x - 96} y={node.y - 64} width="192" height="128" rx="8" fill={colors.air} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
+          <rect x={node.x - 96} y={node.y - 64} width="192" height="36" rx="8" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
+          <text x={node.x} y={node.y - 40} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="18" fontWeight="700">
+            {node.label}
+          </text>
+          {(node.items ?? []).slice(0, 4).map((item, index) => (
+            <text key={item} x={node.x - 78} y={node.y - 4 + index * 22} fill={colors.onyx} fontFamily={fonts.body} fontSize="15">
+              {item}
+            </text>
+          ))}
+        </g>
+      ))}
+    </>
+  );
+}
+
+function renderSwimlaneDiagram(nodes: PositionedDiagramNode[], connections: DiagramConnection[]) {
+  const lanes = Array.from(new Set(nodes.map((node) => node.lane ?? "Team"))).slice(0, 5);
+  const laneHeight = 420 / Math.max(lanes.length, 1);
+  const laneY = (lane: string) => 112 + lanes.indexOf(lane) * laneHeight + laneHeight / 2;
+  const stepNodes = nodes.slice(0, 9).map((node, index) => ({
+    ...node,
+    x: 220 + index * 86,
+    y: laneY(node.lane ?? "Team")
+  }));
+  const nodeById = new Map(stepNodes.map((node) => [node.id, node]));
+
+  return (
+    <>
+      {lanes.map((lane, index) => (
+        <g key={lane}>
+          <line x1="56" y1={112 + index * laneHeight} x2="944" y2={112 + index * laneHeight} stroke={colors.silver} strokeWidth="1" />
+          <text x="76" y={laneY(lane) + 5} fill={colors.silver} fontFamily={fonts.body} fontSize="16" fontWeight="700">
+            {lane.toUpperCase()}
+          </text>
+        </g>
+      ))}
+      <line x1="56" y1="532" x2="944" y2="532" stroke={colors.silver} strokeWidth="1" />
+      {connections.slice(0, 12).map((connection, index) => {
+        const from = nodeById.get(connection.from);
+        const to = nodeById.get(connection.to);
+        if (!from || !to) {
+          return null;
+        }
+        const stroke = connection.kind === "handoff" ? colors.coral : connectionStroke(connection.tone);
+        return <line key={String(index)} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={stroke} strokeWidth="2" markerEnd={markerFor(connection.kind === "handoff" ? "accent" : connection.tone)} />;
+      })}
+      {stepNodes.map((node) => (
+        <g key={node.id}>
+          <rect x={node.x - 70} y={node.y - 30} width="140" height="60" rx="8" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.2" />
+          <text x={node.x} y={node.y + 6} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="17" fontWeight="700">
+            {node.label}
+          </text>
+        </g>
+      ))}
+    </>
+  );
+}
+
+function renderNestedDiagram(nodes: PositionedDiagramNode[]) {
+  return (
+    <>
+      {nodes.slice(0, 6).map((node, index) => {
+        const inset = 48 + index * 52;
+        return (
+          <g key={node.id}>
+            <rect x={inset} y={92 + index * 28} width={1000 - inset * 2} height={440 - index * 56} rx="12" fill={node.role === "focal" ? "rgba(255,55,94,0.08)" : "rgba(29,37,45,0.02)"} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
+            <rect x={inset + 20} y={84 + index * 28} width={Math.max(112, node.label.length * 10)} height="24" fill={colors.air} />
+            <text x={inset + 28} y={102 + index * 28} fill={nodeStroke(node.role)} fontFamily={fonts.body} fontSize="15" fontWeight="700">
+              {node.label.toUpperCase()}
+            </text>
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+function renderTreeDiagram(nodes: PositionedDiagramNode[], connections: DiagramConnection[]) {
+  const treeNodes = nodes.slice(0, 9).map((node, index) => ({
+    ...node,
+    x: node.level === 0 ? 500 : 160 + (index - 1) * 170,
+    y: 132 + (node.level ?? (index === 0 ? 0 : 1)) * 150
+  }));
+  const nodeById = new Map(treeNodes.map((node) => [node.id, node]));
+
+  return (
+    <>
+      {connections.slice(0, 12).map((connection, index) => {
+        const from = nodeById.get(connection.from);
+        const to = nodeById.get(connection.to);
+        if (!from || !to) {
+          return null;
+        }
+        const midY = (from.y + to.y) / 2;
+        return <path key={String(index)} d={"M " + from.x + " " + (from.y + 32) + " V " + midY + " H " + to.x + " V " + (to.y - 32)} fill="none" stroke={colors.silver} strokeWidth="1.4" />;
+      })}
+      {treeNodes.map((node) => (
+        <g key={node.id}>
+          <rect x={node.x - 72} y={node.y - 30} width="144" height="60" rx="8" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.2" />
+          <text x={node.x} y={node.y + 5} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="18" fontWeight="700">
+            {node.label}
+          </text>
+        </g>
+      ))}
+    </>
+  );
+}
+
+function renderLayersDiagram(nodes: PositionedDiagramNode[]) {
+  return (
+    <>
+      {nodes.slice(0, 6).map((node, index) => {
+        const y = 112 + index * 72;
+        return (
+          <g key={node.id}>
+            <rect x="108" y={y} width="784" height="72" fill={nodeFill(node.role)} stroke={nodeStroke(node.role)} strokeWidth="1.2" />
+            <text x="136" y={y + 43} fill={colors.silver} fontFamily={fonts.body} fontSize="15" fontWeight="700">
+              {node.sublabel ?? "L" + String(index + 1)}
+            </text>
+            <text x="300" y={y + 43} fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700">
+              {node.label}
+            </text>
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+function renderVennDiagram(nodes: PositionedDiagramNode[], connections: DiagramConnection[]) {
+  const circles = nodes.slice(0, 3);
+  const defaults = [
+    { x: 400, y: 300, radius: 176 },
+    { x: 600, y: 300, radius: 176 },
+    { x: 500, y: 420, radius: 176 }
+  ];
+  const focalLabel = connections[0]?.label ?? "Overlap";
+
+  return (
+    <>
+      {circles.map((node, index) => {
+        const fallback = defaults[index] ?? defaults[0];
+        const cx = node.x ?? fallback.x;
+        const cy = node.y ?? fallback.y;
+        const radius = node.radius ?? fallback.radius;
+        return (
+          <g key={node.id}>
+            <circle cx={cx} cy={cy} r={radius} fill={node.role === "focal" ? "rgba(255,55,94,0.10)" : "rgba(29,37,45,0.04)"} stroke={nodeStroke(node.role)} strokeWidth="1.4" />
+            <text x={cx} y={cy - radius - 20} textAnchor="middle" fill={colors.onyx} fontFamily={fonts.body} fontSize="22" fontWeight="700">
+              {node.label}
+            </text>
+          </g>
+        );
+      })}
+      <text x="500" y="312" textAnchor="middle" fill={colors.coral} fontFamily={fonts.body} fontSize="24" fontWeight="700">
+        {focalLabel}
+      </text>
+    </>
+  );
+}
+
 function renderDiagram(diagram: GeneratedDiagramSpec) {
   const nodes = layoutDiagramNodes(diagram);
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -450,6 +763,14 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
         </marker>
       </defs>
       <rect width="100%" height="100%" fill={colors.air} />
+      {diagram.type === "sequence" ? renderSequenceDiagram(nodes, connections) : null}
+      {diagram.type === "state" ? renderStateDiagram(nodes, connections) : null}
+      {diagram.type === "er" ? renderErDiagram(nodes, connections) : null}
+      {diagram.type === "swimlane" ? renderSwimlaneDiagram(nodes, connections) : null}
+      {diagram.type === "nested" ? renderNestedDiagram(nodes) : null}
+      {diagram.type === "tree" ? renderTreeDiagram(nodes, connections) : null}
+      {diagram.type === "layers" ? renderLayersDiagram(nodes) : null}
+      {diagram.type === "venn" ? renderVennDiagram(nodes, connections) : null}
       {diagram.type === "quadrant" ? (
         <>
           <line x1="500" y1="112" x2="500" y2="520" stroke={colors.silver} strokeWidth="1.2" />
@@ -460,6 +781,14 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
           <text x="500" y="568" textAnchor="middle" fill={colors.silver} fontFamily={fonts.body} fontSize="18">
             Lower impact
           </text>
+          {diagram.variant === "consultant" ? (
+            <>
+              <text x="132" y="148" fill={colors.coral} fontFamily={fonts.body} fontSize="16" fontWeight="700">DO FIRST</text>
+              <text x="760" y="148" fill={colors.silver} fontFamily={fonts.body} fontSize="16" fontWeight="700">MAJOR PROJECTS</text>
+              <text x="132" y="512" fill={colors.silver} fontFamily={fonts.body} fontSize="16" fontWeight="700">QUICK WINS</text>
+              <text x="820" y="512" fill={colors.silver} fontFamily={fonts.body} fontSize="16" fontWeight="700">AVOID</text>
+            </>
+          ) : null}
         </>
       ) : null}
       {diagram.type === "timeline" ? (
@@ -494,7 +823,7 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
               </g>
             );
           })
-        : diagram.type === "quadrant"
+        : diagram.type === "quadrant" || isSpecializedDiagram(diagram.type)
           ? null
         : connections.map((connection) => {
             const from = nodeById.get(connection.from);
@@ -539,7 +868,7 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
             );
           })}
       {diagram.type === "quadrant" ? nodes.map((node) => renderQuadrantItem(node)) : null}
-      {diagram.type !== "pyramid" && diagram.type !== "quadrant"
+      {diagram.type !== "pyramid" && diagram.type !== "quadrant" && !isSpecializedDiagram(diagram.type)
         ? nodes.map((node) => (
             <g key={node.id}>
               <rect

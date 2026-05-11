@@ -200,9 +200,23 @@ describe("Idris deck runtime orchestration", () => {
     expect(slideFile).not.toContain("Use a native diagram slide");
   });
 
-  it("recognizes the initial supported diagram types in generated slide data", async () => {
+  it("recognizes every supported diagram type in generated slide data", async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
-    const supportedTypes = ["architecture", "flowchart", "timeline", "quadrant", "pyramid"] as const;
+    const supportedTypes = [
+      "architecture",
+      "flowchart",
+      "sequence",
+      "state",
+      "er",
+      "timeline",
+      "swimlane",
+      "quadrant",
+      "nested",
+      "tree",
+      "layers",
+      "venn",
+      "pyramid"
+    ] as const;
 
     const project = await createProjectFromOutline({
       workspaceRoot,
@@ -224,7 +238,7 @@ describe("Idris deck runtime orchestration", () => {
             ],
             connections: [{ from: "a", to: "b", label: "NEXT" }]
           }
-        }))
+        })) as any
       }
     });
 
@@ -234,6 +248,167 @@ describe("Idris deck runtime orchestration", () => {
       expect(slideFile).toContain(`"type": "${type}"`);
     }
     expect(slideFile).toContain("renderDiagram");
+  });
+
+  it("emits native renderers for the remaining diagram grammars", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create slides with all remaining diagram types",
+      outline: {
+        title: "Remaining Diagrams",
+        summary: "A deck of remaining diagram types.",
+        slides: [
+          {
+            title: "Sequence",
+            content: "A request flow.",
+            goal: "Show sequence grammar.",
+            layout: "Sequence diagram",
+            visualDirection: "Use lifelines.",
+            diagram: {
+              type: "sequence",
+              nodes: [
+                { id: "client", label: "Client" },
+                { id: "api", label: "API" }
+              ],
+              connections: [{ from: "client", to: "api", label: "CALL", kind: "call" }]
+            }
+          },
+          {
+            title: "State",
+            content: "A state flow.",
+            goal: "Show state grammar.",
+            layout: "State diagram",
+            visualDirection: "Use start and end dots.",
+            diagram: {
+              type: "state",
+              nodes: [
+                { id: "draft", label: "Draft" },
+                { id: "sent", label: "Sent", role: "focal" }
+              ],
+              connections: [{ from: "draft", to: "sent", label: "SUBMIT", kind: "transition" }]
+            }
+          },
+          {
+            title: "Data Model",
+            content: "A data model.",
+            goal: "Show ER grammar.",
+            layout: "ER diagram",
+            visualDirection: "Use entity boxes.",
+            diagram: {
+              type: "er",
+              nodes: [
+                { id: "user", label: "User", items: ["# id", "email"] },
+                { id: "deck", label: "Deck", items: ["# id", "-> user_id"] }
+              ],
+              connections: [
+                { from: "user", to: "deck", label: "owns", kind: "relationship", cardinalityFrom: "1", cardinalityTo: "N" }
+              ]
+            }
+          },
+          {
+            title: "Swimlane",
+            content: "A handoff flow.",
+            goal: "Show swimlane grammar.",
+            layout: "Swimlane diagram",
+            visualDirection: "Use lanes.",
+            diagram: {
+              type: "swimlane",
+              nodes: [
+                { id: "brief", label: "Brief", lane: "Strategy" },
+                { id: "ship", label: "Ship", lane: "Design" }
+              ],
+              connections: [{ from: "brief", to: "ship", label: "HANDOFF", kind: "handoff" }]
+            }
+          },
+          {
+            title: "Nested",
+            content: "Containment levels.",
+            goal: "Show nested grammar.",
+            layout: "Nested diagram",
+            visualDirection: "Use rings.",
+            diagram: {
+              type: "nested",
+              nodes: [
+                { id: "workspace", label: "Workspace", level: 0 },
+                { id: "project", label: "Project", level: 1, role: "focal" }
+              ]
+            }
+          },
+          {
+            title: "Tree",
+            content: "Hierarchy.",
+            goal: "Show tree grammar.",
+            layout: "Tree diagram",
+            visualDirection: "Use elbow connectors.",
+            diagram: {
+              type: "tree",
+              nodes: [
+                { id: "root", label: "Root", level: 0 },
+                { id: "child", label: "Child", level: 1 }
+              ],
+              connections: [{ from: "root", to: "child" }]
+            }
+          },
+          {
+            title: "Layers",
+            content: "Stacked layers.",
+            goal: "Show layer grammar.",
+            layout: "Layer stack diagram",
+            visualDirection: "Use bands.",
+            diagram: {
+              type: "layers",
+              nodes: [
+                { id: "app", label: "Application", sublabel: "L3" },
+                { id: "data", label: "Data", sublabel: "L2", role: "focal" }
+              ]
+            }
+          },
+          {
+            title: "Venn",
+            content: "Set overlap.",
+            goal: "Show Venn grammar.",
+            layout: "Venn diagram",
+            visualDirection: "Use overlapping circles.",
+            diagram: {
+              type: "venn",
+              nodes: [
+                { id: "fruit", label: "Fruit" },
+                { id: "single", label: "One seed", role: "focal" }
+              ],
+              connections: [{ from: "fruit", to: "single", label: "Sweet spot" }]
+            }
+          },
+          {
+            title: "Consultant Matrix",
+            content: "Scenario map.",
+            goal: "Show consultant quadrant.",
+            layout: "Consultant quadrant diagram",
+            visualDirection: "Use named regions.",
+            diagram: {
+              type: "quadrant",
+              variant: "consultant",
+              nodes: [{ id: "base", label: "Base case", role: "focal" }]
+            }
+          }
+        ] as any
+      }
+    });
+
+    const slideFile = await readFile(join(project.deckPath, "slides", "remaining-diagrams", "index.tsx"), "utf8");
+
+    expect(slideFile).toContain("function renderSequenceDiagram");
+    expect(slideFile).toContain("strokeDasharray");
+    expect(slideFile).toContain("function renderStateDiagram");
+    expect(slideFile).toContain("function renderErDiagram");
+    expect(slideFile).toContain("cardinalityFrom");
+    expect(slideFile).toContain("function renderSwimlaneDiagram");
+    expect(slideFile).toContain("function renderNestedDiagram");
+    expect(slideFile).toContain("function renderTreeDiagram");
+    expect(slideFile).toContain("function renderLayersDiagram");
+    expect(slideFile).toContain("function renderVennDiagram");
+    expect(slideFile).toContain('"variant": "consultant"');
   });
 
   it("renders quadrant items as dot labels instead of boxed nodes", async () => {
