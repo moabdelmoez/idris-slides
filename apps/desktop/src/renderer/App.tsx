@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { KeyRound, Monitor, Settings } from "lucide-react";
+import {
+  FolderOpen,
+  Home,
+  KeyRound,
+  Monitor,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Settings
+} from "lucide-react";
 import { ChatPanel } from "./components/ChatPanel";
 import { PreviewPane } from "./components/PreviewPane";
 import type { ProjectMetadata } from "@idris-slides/project";
@@ -33,6 +42,7 @@ export function App() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
+  const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   const [activeProject, setActiveProject] = useState<ProjectMetadata | null>(null);
   const [slideModuleUrl, setSlideModuleUrl] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState("");
@@ -46,8 +56,17 @@ export function App() {
   useEffect(() => {
     if (window.idrisSlides) {
       void window.idrisSlides.getSettings().then(setSettings);
+      void refreshProjects();
     }
   }, []);
+
+  async function refreshProjects(): Promise<void> {
+    if (!window.idrisSlides) {
+      return;
+    }
+
+    setProjects(await window.idrisSlides.listProjects());
+  }
 
   async function saveKey(): Promise<void> {
     if (!window.idrisSlides) {
@@ -180,6 +199,7 @@ export function App() {
         }
       ]);
       await startPreview(project);
+      await refreshProjects();
     } catch (caught) {
       const detail = caught instanceof Error ? caught.message : "Unable to create deck.";
       setError(detail);
@@ -194,6 +214,32 @@ export function App() {
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function chooseWorkspaceRoot(): Promise<void> {
+    if (!window.idrisSlides) {
+      setError(bridgeUnavailableMessage);
+      return;
+    }
+
+    setError(null);
+    setSettings(await window.idrisSlides.chooseWorkspaceRoot());
+    setActiveProject(null);
+    setSlideModuleUrl(null);
+    setMessages([]);
+    await refreshProjects();
+  }
+
+  async function openProject(project: ProjectMetadata): Promise<void> {
+    updateActiveProject(project);
+    setMessages([]);
+    await startPreview(project);
+  }
+
+  function goHome(): void {
+    setActiveProject(null);
+    setSlideModuleUrl(null);
+    setMessages([]);
   }
 
   async function exportProject(kind: "pdf" | "html"): Promise<void> {
@@ -232,13 +278,23 @@ export function App() {
   }
 
   return (
-    <div className={`appShell ${hasActiveProject ? "hasProject" : "isIntro"}`}>
+    <div
+      className={`appShell ${hasActiveProject ? "hasProject" : "isIntro"} ${
+        projectsCollapsed ? "projectsCollapsed" : ""
+      }`}
+    >
       <header className="topBar">
         <div className="topBarIdentity">
           <h1>{activeProject?.name ?? "Idris Slides"}</h1>
           <span>{activeProject ? "Deck workspace" : "New deck"}</span>
         </div>
         <div className="topBarActions">
+          {activeProject ? (
+            <button className="toolbarButton" type="button" onClick={goHome}>
+              <Home size={16} aria-hidden="true" />
+              <span>Home</span>
+            </button>
+          ) : null}
           <button className="toolbarButton" type="button" onClick={() => setSettingsOpen(true)}>
             <Settings size={16} aria-hidden="true" />
             <span>Settings</span>
@@ -252,6 +308,85 @@ export function App() {
         </div>
       ) : null}
       <div className="workspace">
+        <aside className="projectSidebar" aria-label="Projects">
+          <div className="projectSidebarHeader">
+            {!projectsCollapsed ? (
+              <>
+                <div>
+                  <p className="panelEyebrow">Workspace</p>
+                  <strong>Projects</strong>
+                </div>
+                <button
+                  aria-label="Collapse projects sidebar"
+                  className="sidebarIconButton"
+                  type="button"
+                  onClick={() => setProjectsCollapsed(true)}
+                >
+                  <PanelLeftClose size={16} aria-hidden="true" />
+                </button>
+              </>
+            ) : (
+              <button
+                aria-label="Expand projects sidebar"
+                className="sidebarIconButton"
+                type="button"
+                onClick={() => setProjectsCollapsed(false)}
+              >
+                <PanelLeftOpen size={16} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          {!projectsCollapsed ? (
+            <>
+              <button className="projectAction" type="button" onClick={goHome}>
+                <Plus size={16} aria-hidden="true" />
+                <span>New deck</span>
+              </button>
+              <button
+                aria-label="Change workspace folder"
+                className="workspacePath"
+                type="button"
+                onClick={() => void chooseWorkspaceRoot()}
+              >
+                <FolderOpen size={15} aria-hidden="true" />
+                <span>{settings.workspaceRoot ?? "Choose workspace"}</span>
+              </button>
+              <div className="projectList" aria-label="Recent projects">
+                <p className="panelEyebrow">Recents</p>
+                {projects.length > 0 ? (
+                  projects.map((project) => (
+                    <button
+                      aria-label={`Open ${project.name}`}
+                      className={`projectItem ${activeProject?.id === project.id ? "activeProject" : ""}`}
+                      key={project.id}
+                      type="button"
+                      onClick={() => void openProject(project)}
+                    >
+                      <strong>{project.name}</strong>
+                      <span>{project.slideCount ? `${project.slideCount} slides` : "Deck project"}</span>
+                    </button>
+                  ))
+                ) : (
+                  <span className="emptyProjects">No saved projects yet.</span>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <button aria-label="New deck" className="sidebarIconButton" type="button" onClick={goHome}>
+                <Plus size={16} aria-hidden="true" />
+              </button>
+              <button
+                aria-label="Change workspace folder"
+                className="sidebarIconButton"
+                type="button"
+                onClick={() => void chooseWorkspaceRoot()}
+              >
+                <FolderOpen size={16} aria-hidden="true" />
+              </button>
+            </>
+          )}
+        </aside>
         {activeProject ? (
           <main className="deckStage">
             <PreviewPane
@@ -273,16 +408,16 @@ export function App() {
             />
           </main>
         ) : (
-        <ChatPanel
-          canSend={isDesktopBridgeAvailable && settings.hasGeminiApiKey}
-          isGenerating={isGenerating}
-          message={message}
-          messages={messages}
-          mode="intro"
-          onMessageChange={setMessage}
-          onApproveOutline={(outline) => void approveOutline(outline)}
-          onSubmit={() => void submitPrompt()}
-        />
+          <ChatPanel
+            canSend={isDesktopBridgeAvailable && settings.hasGeminiApiKey}
+            isGenerating={isGenerating}
+            message={message}
+            messages={messages}
+            mode="intro"
+            onMessageChange={setMessage}
+            onApproveOutline={(outline) => void approveOutline(outline)}
+            onSubmit={() => void submitPrompt()}
+          />
         )}
       </div>
       {settingsOpen ? (
@@ -308,6 +443,19 @@ export function App() {
                 value={apiKey}
               />
             </label>
+            <div className="settingsField">
+              <span>Project workspace</span>
+              <button
+                aria-label="Change workspace folder"
+                className="workspaceSettingsButton"
+                disabled={!isDesktopBridgeAvailable}
+                type="button"
+                onClick={() => void chooseWorkspaceRoot()}
+              >
+                <FolderOpen size={15} aria-hidden="true" />
+                <span>{settings.workspaceRoot ?? "Choose workspace"}</span>
+              </button>
+            </div>
             {error ? <p className="errorText">{error}</p> : null}
             {!isDesktopBridgeAvailable ? (
               <p className="bridgeHelp">{bridgeUnavailableMessage}</p>

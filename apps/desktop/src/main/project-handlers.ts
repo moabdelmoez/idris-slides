@@ -1,28 +1,28 @@
-import { app } from "electron";
-import { relative, resolve, join } from "node:path";
-import { createProject, createProjectFromOutline } from "@idris-slides/project";
+import { relative, resolve } from "node:path";
+import { createProject, createProjectFromOutline, listProjects } from "@idris-slides/project";
 import type { ProjectMetadata } from "@idris-slides/project";
 import type { DeckOutline } from "../shared/types";
 import { startProjectPreview } from "./preview-manager";
-
-function workspaceRoot(): string {
-  return join(app.getPath("userData"), "projects");
-}
+import { getWorkspaceRoot } from "./settings-handlers";
 
 export async function createLocalProject(name: string) {
-  return createProject({ name, workspaceRoot: workspaceRoot() });
+  return createProject({ name, workspaceRoot: await getWorkspaceRoot() });
 }
 
 export async function createLocalDeckFromOutline(prompt: string, outline: DeckOutline) {
   return createProjectFromOutline({
     prompt,
     outline,
-    workspaceRoot: workspaceRoot()
+    workspaceRoot: await getWorkspaceRoot()
   });
 }
 
-export function assertLocalProject(project: ProjectMetadata): ProjectMetadata {
-  const root = resolve(workspaceRoot());
+export async function listLocalProjects(): Promise<ProjectMetadata[]> {
+  return listProjects(await getWorkspaceRoot());
+}
+
+export async function assertLocalProject(project: ProjectMetadata): Promise<ProjectMetadata> {
+  const root = resolve(await getWorkspaceRoot());
   const deckPath = resolve(project.deckPath);
   const pathFromRoot = relative(root, deckPath);
 
@@ -34,5 +34,5 @@ export function assertLocalProject(project: ProjectMetadata): ProjectMetadata {
 }
 
 export async function startLocalPreview(project: ProjectMetadata) {
-  return startProjectPreview(assertLocalProject(project));
+  return startProjectPreview(await assertLocalProject(project));
 }

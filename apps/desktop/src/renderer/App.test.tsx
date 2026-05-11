@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { IdrisSlidesApi } from "../preload/preload";
@@ -69,8 +69,16 @@ describe("App", () => {
         sourcePrompt: "Create a 5 slide deck about market expansion",
         slideCount: 1
       }),
-      getSettings: vi.fn().mockResolvedValue({ hasGeminiApiKey: false }),
-      saveGeminiApiKey: vi.fn().mockResolvedValue({ hasGeminiApiKey: true }),
+      listProjects: vi.fn().mockResolvedValue([]),
+      chooseWorkspaceRoot: vi.fn().mockResolvedValue({
+        hasGeminiApiKey: false,
+        workspaceRoot: "/tmp/idris-workspace"
+      }),
+      getSettings: vi.fn().mockResolvedValue({ hasGeminiApiKey: false, workspaceRoot: "/tmp/idris-workspace" }),
+      saveGeminiApiKey: vi.fn().mockResolvedValue({
+        hasGeminiApiKey: true,
+        workspaceRoot: "/tmp/idris-workspace"
+      }),
       generateOutline: vi.fn().mockResolvedValue({
         title: "Market Expansion",
         summary: "A branded outline for expansion planning.",
@@ -92,6 +100,8 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Idris Slides" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse projects sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New deck" })).toBeInTheDocument();
     expect(screen.getByText("What slides should Idris build?")).toBeInTheDocument();
     expect(screen.getByLabelText("Deck command")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add context" })).toBeInTheDocument();
@@ -170,6 +180,157 @@ describe("App", () => {
       expect.objectContaining({ id: "project-1" }),
       "Make this more executive"
     );
+  });
+
+  it("opens saved projects from the sidebar and returns home", async () => {
+    window.idrisSlides = {
+      ...(window.idrisSlides as IdrisSlidesApi),
+      listProjects: vi.fn().mockResolvedValue([
+        {
+          id: "saved-project",
+          name: "Saved Deck",
+          createdAt: "2026-05-06T00:00:00.000Z",
+          updatedAt: "2026-05-07T00:00:00.000Z",
+          deckPath: "/tmp/idris/saved-project/deck",
+          exports: [],
+          slideCount: 2
+        }
+      ])
+    };
+
+    render(<App />);
+
+    const savedProjectButton = await screen.findByRole("button", { name: /Open Saved Deck/ });
+
+    expect(savedProjectButton).toHaveTextContent("Saved Deck");
+    expect(savedProjectButton).toHaveTextContent("2 slides");
+
+    fireEvent.click(savedProjectButton);
+
+    expect(await screen.findByText("Deck preview loaded.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Saved Deck" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Home" }));
+
+    expect(screen.getByRole("heading", { name: "Idris Slides" })).toBeInTheDocument();
+    expect(screen.getByText("What slides should Idris build?")).toBeInTheDocument();
+  });
+
+  it("changes the workspace directory from the sidebar", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Change workspace folder" }));
+
+    await waitFor(() => {
+      expect(window.idrisSlides?.chooseWorkspaceRoot).toHaveBeenCalled();
+      expect(window.idrisSlides?.listProjects).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("scrolls chat to the newest message", async () => {
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Gemini API key"), {
+      target: { value: "test-key" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save API Key" }));
+
+    await waitFor(() => {
+      expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
+    });
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Create one-slide deck contains Mostafa" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await screen.findByText("Market Expansion");
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("navigates a multi-slide preview with visible controls", async () => {
+    window.idrisSlides = {
+      ...(window.idrisSlides as IdrisSlidesApi),
+      startPreview: vi.fn().mockResolvedValue({
+        projectId: "project-1",
+        url: "http://127.0.0.1:5317",
+        slideModuleUrl:
+          "data:text/javascript,export%20default%20%5Bfunction%20SlideOne()%20%7B%20return%20null%3B%20%7D%2Cfunction%20SlideTwo()%20%7B%20return%20null%3B%20%7D%5D%3B#initial=1"
+      })
+    };
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Gemini API key"), {
+      target: { value: "test-key" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save API Key" }));
+
+    await waitFor(() => {
+      expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
+    });
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Create a 2 slide deck" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve outline" }));
+
+    expect(await screen.findByText("1 / 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous slide" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" }));
+
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next slide" })).toBeDisabled();
+  });
+
+  it("opens the current preview slide in a fullscreen overlay", async () => {
+    window.idrisSlides = {
+      ...(window.idrisSlides as IdrisSlidesApi),
+      startPreview: vi.fn().mockResolvedValue({
+        projectId: "project-1",
+        url: "http://127.0.0.1:5317",
+        slideModuleUrl:
+          "data:text/javascript,export%20default%20%5Bfunction%20SlideOne()%20%7B%20return%20null%3B%20%7D%2Cfunction%20SlideTwo()%20%7B%20return%20null%3B%20%7D%5D%3B#initial=1"
+      })
+    };
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.change(screen.getByLabelText("Gemini API key"), {
+      target: { value: "test-key" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save API Key" }));
+
+    await waitFor(() => {
+      expect(window.idrisSlides?.saveGeminiApiKey).toHaveBeenCalledWith("test-key");
+    });
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Create a 2 slide deck" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve outline" }));
+
+    await screen.findByText("1 / 2");
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fullscreen preview" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Fullscreen preview" });
+    expect(within(dialog).getByText("2 / 2")).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Previous slide" }));
+    expect(within(dialog).getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Fullscreen preview" })).not.toBeInTheDocument();
   });
 
   it("cache-busts the slide module after deck edits instead of relying on Vite page reloads", async () => {

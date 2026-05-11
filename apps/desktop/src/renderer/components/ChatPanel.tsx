@@ -1,4 +1,5 @@
 import { ArrowUp, ChevronDown, Loader2, Plus, Sparkles } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { ChatMessage, DeckOutline } from "../../shared/types";
 
 type ChatPanelProps = {
@@ -22,11 +23,18 @@ export function ChatPanel({
   onApproveOutline,
   onSubmit
 }: ChatPanelProps) {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const composerPlaceholder = messages.some((item) => item.outline)
     ? "Tell Idris what to change in this deck"
     : "Describe the deck, audience, and source points";
 
   const hasMessages = messages.length > 0;
+
+  useEffect(() => {
+    if (typeof messagesEndRef.current?.scrollIntoView === "function") {
+      messagesEndRef.current.scrollIntoView({ block: "end" });
+    }
+  }, [messages]);
 
   return (
     <section className={`chatPanel ${mode === "intro" ? "introPanel" : "dockPanel"}`} aria-label="Command panel">
@@ -53,45 +61,48 @@ export function ChatPanel({
             )}
           </div>
         ) : (
-          messages.map((item) => (
-            <article className={`chatMessage ${item.role}`} key={item.id}>
-              <span className="messageRole">{item.role === "assistant" ? "Idris" : item.role}</span>
-              <p>{item.content}</p>
-              {item.outline ? (
-                <div className="outlineCard">
-                  <div className="outlineHeader">
-                    <span>Outline ready</span>
-                    <strong>{item.outline.slides.length} slides</strong>
+          <>
+            {messages.map((item) => (
+              <article className={`chatMessage ${item.role}`} key={item.id}>
+                <span className="messageRole">{item.role === "assistant" ? "Idris" : item.role}</span>
+                <p>{item.content}</p>
+                {item.outline ? (
+                  <div className="outlineCard">
+                    <div className="outlineHeader">
+                      <span>Outline ready</span>
+                      <strong>{item.outline.slides.length} slides</strong>
+                    </div>
+                    <h3>{item.outline.title}</h3>
+                    <p>{item.outline.summary}</p>
+                    <ol>
+                      {item.outline.slides.map((slide) => (
+                        <li key={`${item.id}-${slide.title}`}>
+                          <strong>{slide.title}</strong>
+                          <span>{slide.content ?? slide.goal}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <button
+                      className="approveOutlineButton primaryButton"
+                      disabled={isGenerating}
+                      onClick={() => onApproveOutline(item.outline as DeckOutline)}
+                      type="button"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="loadingIcon" size={14} aria-hidden="true" />
+                          Building deck
+                        </>
+                      ) : (
+                        "Approve outline"
+                      )}
+                    </button>
                   </div>
-                  <h3>{item.outline.title}</h3>
-                  <p>{item.outline.summary}</p>
-                  <ol>
-                    {item.outline.slides.map((slide) => (
-                      <li key={`${item.id}-${slide.title}`}>
-                        <strong>{slide.title}</strong>
-                        <span>{slide.content ?? slide.goal}</span>
-                      </li>
-                    ))}
-                  </ol>
-                  <button
-                    className="approveOutlineButton primaryButton"
-                    disabled={isGenerating}
-                    onClick={() => onApproveOutline(item.outline as DeckOutline)}
-                    type="button"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="loadingIcon" size={14} aria-hidden="true" />
-                        Building deck
-                      </>
-                    ) : (
-                      "Approve outline"
-                    )}
-                  </button>
-                </div>
-              ) : null}
-            </article>
-          ))
+                ) : null}
+              </article>
+            ))}
+            <div ref={messagesEndRef} />
+          </>
         )}
       </div>
       <form

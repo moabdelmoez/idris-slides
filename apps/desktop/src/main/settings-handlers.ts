@@ -1,4 +1,4 @@
-import { app, safeStorage } from "electron";
+import { app, dialog, safeStorage } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AppSettings } from "../shared/types";
@@ -6,10 +6,15 @@ import type { AppSettings } from "../shared/types";
 type StoredSettings = {
   geminiApiKey?: string;
   encrypted?: boolean;
+  workspaceRoot?: string;
 };
 
 function settingsPath(): string {
   return join(app.getPath("userData"), "settings.json");
+}
+
+export function defaultWorkspaceRoot(): string {
+  return join(app.getPath("userData"), "projects");
 }
 
 async function readStoredSettings(): Promise<StoredSettings> {
@@ -30,7 +35,7 @@ async function writeStoredSettings(settings: StoredSettings): Promise<void> {
   await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
-function encryptSecret(secret: string): StoredSettings {
+function encryptSecret(secret: string): Pick<StoredSettings, "geminiApiKey" | "encrypted"> {
   if (safeStorage.isEncryptionAvailable()) {
     return {
       geminiApiKey: safeStorage.encryptString(secret).toString("base64"),
@@ -55,21 +60,45 @@ function decryptSecret(settings: StoredSettings): string | null {
 
 export async function getSettings(): Promise<AppSettings> {
   const settings = await readStoredSettings();
-  return { hasGeminiApiKey: Boolean(settings.geminiApiKey) };
+  return {
+    hasGeminiApiKey: Boolean(settings.geminiApiKey),
+    workspaceRoot: settings.workspaceRoot ?? defaultWorkspaceRoot()
+  };
 }
 
 export async function saveGeminiApiKey(apiKey: string): Promise<AppSettings> {
   const trimmed = apiKey.trim();
+  const current = await readStoredSettings();
 
   if (!trimmed) {
-    await writeStoredSettings({});
-    return { hasGeminiApiKey: false };
+    await writeStoredSettings({ workspaceRoot: current.workspaceRoot });
+    return getSettings();
   }
 
-  await writeStoredSettings(encryptSecret(trimmed));
-  return { hasGeminiApiKey: true };
+  await writeStoredSettings({ ...current, ...encryptSecret(trimmed) });
+  return getSettings();
 }
 
 export async function getGeminiApiKey(): Promise<string | null> {
   return decryptSecret(await readStoredSettings());
+}
+
+export async function getWorkspaceRoot(): Promise<string> {
+  return (await getSettings()).workspaceRoot ?? defaultWorkspaceRoot();
+}
+
+export async function chooseWorkspaceRoot(): Promise<AppSettings> {
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory", "createDirectory"],
+    title: "Choose Idris Slides workspace"
+  });
+
+  if (result.canceled || !result.filePaths[0]) {
+    return getSettings();
+  }
+
+  const current = await readStoredSettings();
+  await mkdir(result.filePaths[0], { recursive: true });
+  await writeStoredSettings({ ...current, workspaceRoot: result.filePaths[0] });
+  return getSettings();
 }

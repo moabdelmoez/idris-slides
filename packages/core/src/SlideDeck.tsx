@@ -7,6 +7,8 @@ export type Page = React.ComponentType;
 export type SlideDeckProps = {
   pages: Page[];
   initialIndex?: number;
+  currentIndex?: number;
+  onIndexChange?(index: number): void;
   presentMode?: boolean;
 };
 
@@ -43,11 +45,25 @@ const canvasStyle: CSSProperties = {
   transformOrigin: "top left"
 };
 
-export function SlideDeck({ initialIndex = 0, pages, presentMode = false }: SlideDeckProps) {
+export function SlideDeck({
+  currentIndex: controlledIndex,
+  initialIndex = 0,
+  onIndexChange,
+  pages,
+  presentMode = false
+}: SlideDeckProps) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [uncontrolledIndex, setUncontrolledIndex] = useState(initialIndex);
   const [scale, setScale] = useState(1);
+  const currentIndex = controlledIndex ?? uncontrolledIndex;
   const CurrentPage = useMemo(() => pages[currentIndex] ?? pages[0], [currentIndex, pages]);
+
+  function setCurrentIndex(index: number): void {
+    if (controlledIndex === undefined) {
+      setUncontrolledIndex(index);
+    }
+    onIndexChange?.(index);
+  }
 
   useIsomorphicLayoutEffect(() => {
     const frame = frameRef.current;

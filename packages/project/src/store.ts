@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { nanoid } from "nanoid";
 import {
   projectAssetsPath,
@@ -43,6 +43,33 @@ export async function createProject(input: CreateProjectInput): Promise<ProjectM
 export async function readProject(root: string): Promise<ProjectMetadata> {
   const raw = await readFile(projectMetadataPath(root), "utf8");
   return JSON.parse(raw) as ProjectMetadata;
+}
+
+export async function listProjects(workspaceRoot: string): Promise<ProjectMetadata[]> {
+  let entries: string[];
+
+  try {
+    entries = await readdir(workspaceRoot);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  const projects = await Promise.all(
+    entries.map(async (entry) => {
+      try {
+        return await readProject(projectRoot(workspaceRoot, entry));
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return projects
+    .filter((project): project is ProjectMetadata => Boolean(project))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
 export async function updateProject(

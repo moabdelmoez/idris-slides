@@ -1,5 +1,6 @@
 export type AppSettings = {
   hasGeminiApiKey: boolean;
+  workspaceRoot?: string;
 };
 
 export type DeckOutlineSlide = {

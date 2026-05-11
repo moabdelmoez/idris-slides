@@ -5,10 +5,12 @@ import type { AppSettings, DeckOutline, PreviewSessionInfo } from "../shared/typ
 export type IdrisSlidesApi = {
   createProject(name: string): Promise<ProjectMetadata>;
   createDeckFromOutline(prompt: string, outline: DeckOutline): Promise<ProjectMetadata>;
+  listProjects(): Promise<ProjectMetadata[]>;
   editDeck(project: ProjectMetadata, prompt: string): Promise<ProjectMetadata>;
   startPreview(project: ProjectMetadata): Promise<PreviewSessionInfo>;
   exportProject(project: ProjectMetadata, kind: "pdf" | "html"): Promise<ProjectMetadata>;
   getSettings(): Promise<AppSettings>;
+  chooseWorkspaceRoot(): Promise<AppSettings>;
   saveGeminiApiKey(apiKey: string): Promise<AppSettings>;
   generateOutline(prompt: string): Promise<DeckOutline>;
 };
@@ -19,6 +21,9 @@ const api: IdrisSlidesApi = {
   },
   createDeckFromOutline(prompt, outline) {
     return ipcRenderer.invoke("projects:createDeckFromOutline", prompt, outline) as Promise<ProjectMetadata>;
+  },
+  listProjects() {
+    return ipcRenderer.invoke("projects:list") as Promise<ProjectMetadata[]>;
   },
   editDeck(project, prompt) {
     return ipcRenderer.invoke("projects:editDeck", project, prompt) as Promise<ProjectMetadata>;
@@ -31,6 +36,9 @@ const api: IdrisSlidesApi = {
   },
   getSettings() {
     return ipcRenderer.invoke("settings:get") as Promise<AppSettings>;
+  },
+  chooseWorkspaceRoot() {
+    return ipcRenderer.invoke("settings:chooseWorkspaceRoot") as Promise<AppSettings>;
   },
   saveGeminiApiKey(apiKey) {
     return ipcRenderer.invoke("settings:saveGeminiApiKey", apiKey) as Promise<AppSettings>;
