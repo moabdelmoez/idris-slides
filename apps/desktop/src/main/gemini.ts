@@ -31,6 +31,46 @@ const outlineSchema = {
           goal: { type: "STRING" },
           layout: { type: "STRING" },
           visualDirection: { type: "STRING" },
+          emphasis: {
+            type: "STRING",
+            enum: ["balanced", "dense", "hero"]
+          },
+          visualSystem: {
+            type: "STRING",
+            enum: ["editorial", "executive", "technical"]
+          },
+          blocks: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                label: { type: "STRING" },
+                value: { type: "STRING" },
+                detail: { type: "STRING" },
+                tone: {
+                  type: "STRING",
+                  enum: ["coral", "moon", "oasis", "purple", "sea", "silver", "sunlight", "sunset"]
+                }
+              },
+              required: ["label"]
+            }
+          },
+          metrics: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                label: { type: "STRING" },
+                value: { type: "STRING" },
+                detail: { type: "STRING" },
+                tone: {
+                  type: "STRING",
+                  enum: ["coral", "moon", "oasis", "purple", "sea", "silver", "sunlight", "sunset"]
+                }
+              },
+              required: ["label"]
+            }
+          },
           diagram: {
             type: "OBJECT",
             nullable: true,
@@ -147,6 +187,11 @@ function buildOutlinePrompt(prompt: string, researchBrief?: ResearchBrief): stri
     "If the user asks for an exact number of slides, return exactly that many slide objects.",
     "If the user asks for one slide, return a single slide object that contains the requested content.",
     "For each slide, content is the only audience-facing body copy that may appear on the slide.",
+    "Use structured fields to create layout-ready React slides: emphasis, visualSystem, blocks, metrics, and diagram where useful.",
+    "Keep the STC/Solutions visual system: confident typography, full-canvas composition, crisp folios, structured blocks, and approved palette accents.",
+    "For blocks, use concise label/value/detail objects for cards, comparison points, timeline steps, or technical concepts. For metrics, use measurable label/value/detail objects.",
+    "Use emphasis hero for title, metric, and decisive executive slides; dense for technical or multi-point slides; balanced for most slides.",
+    "Use visualSystem executive for business decks, technical for architecture/developer content, and editorial for narrative explainers.",
     "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
     "When a slide should be a diagram, set layout to a diagram layout and include a diagram object.",
     "Supported diagram types: architecture, flowchart, sequence, state, er, timeline, swimlane, quadrant, nested, tree, layers, venn, pyramid.",
@@ -177,6 +222,9 @@ function buildEditPrompt(project: ProjectMetadata, editPrompt: string): string {
     "The slides array is the complete deck. Do not assume or add a separate title page outside the requested slide count.",
     "If the user asks for an exact number of slides, return exactly that many slide objects.",
     "For each slide, content is the only audience-facing body copy that may appear on the slide.",
+    "Use structured fields to create layout-ready React slides: emphasis, visualSystem, blocks, metrics, and diagram where useful.",
+    "Keep the STC/Solutions visual system: confident typography, full-canvas composition, crisp folios, structured blocks, and approved palette accents.",
+    "Preserve or improve blocks and metrics when they make the slide more visual and easier to render.",
     "Keep goal and visualDirection as internal planning notes; never write labels like Visual direction into content.",
     "Preserve approved brand direction and use only approved layouts/colors.",
     "When revising a diagram slide, return the full updated diagram object. Keep diagrams within 9 nodes and 12 connections.",

@@ -51,4 +51,52 @@ describe("Gemini outline generation", () => {
     expect(prompt).toContain("5G is a growth priority.");
     expect(prompt).toContain("https://example.com/outlook");
   });
+
+  it("requests layout-ready structured STC slide fields instead of plain copy only", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    title: "Structured Deck",
+                    summary: "A structured deck.",
+                    slides: [
+                      {
+                        title: "Readiness",
+                        content: "Readiness depends on capacity and care.",
+                        goal: "Show readiness.",
+                        layout: "Metric slide",
+                        visualDirection: "Use structured cards.",
+                        emphasis: "hero",
+                        visualSystem: "executive",
+                        blocks: [{ label: "Capacity", value: "92%", detail: "Headroom", tone: "coral" }]
+                      }
+                    ]
+                  })
+                }
+              ]
+            }
+          }
+        ]
+      })
+    });
+
+    await generateGeminiOutline("gemini-key", "Create a deck", { fetchImpl: fetchMock });
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    const prompt = request.contents[0].parts[0].text;
+    const slideProperties = request.generationConfig.responseSchema.properties.slides.items.properties;
+
+    expect(prompt).toContain("structured fields");
+    expect(prompt).toContain("STC/Solutions visual system");
+    expect(prompt).toContain("blocks");
+    expect(slideProperties).toHaveProperty("emphasis");
+    expect(slideProperties).toHaveProperty("visualSystem");
+    expect(slideProperties).toHaveProperty("blocks");
+    expect(slideProperties).toHaveProperty("metrics");
+  });
 });

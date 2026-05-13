@@ -158,6 +158,49 @@ describe("Idris deck runtime orchestration", () => {
     expect(slideFile).toContain("function ClosingPage");
   });
 
+  it("preserves richer structured slide fields for polished STC layout rendering", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create a premium operating review",
+      outline: {
+        title: "Operating Review",
+        summary: "A richer executive deck.",
+        slides: [
+          {
+            title: "Network Readiness",
+            content: "Launch confidence depends on capacity, coverage, and care readiness.",
+            goal: "Show a polished executive status slide.",
+            layout: "Metric slide",
+            visualDirection: "Use large confident typography and structured metric cards.",
+            emphasis: "hero",
+            visualSystem: "executive",
+            blocks: [
+              { label: "Capacity", value: "92%", detail: "Peak-hour headroom", tone: "coral" },
+              { label: "Coverage", value: "18", detail: "Priority districts", tone: "sea" },
+              { label: "Care", value: "4.8", detail: "Target response score", tone: "oasis" }
+            ],
+            metrics: [
+              { label: "Launch gates", value: "7/9", detail: "Two pending owners", tone: "sunlight" }
+            ]
+          }
+        ]
+      }
+    });
+
+    const slideFile = await readFile(join(project.deckPath, "slides", "operating-review", "index.tsx"), "utf8");
+
+    expect(slideFile).toContain('"emphasis": "hero"');
+    expect(slideFile).toContain('"visualSystem": "executive"');
+    expect(slideFile).toContain('"label": "Capacity"');
+    expect(slideFile).toContain('"value": "92%"');
+    expect(slideFile).toContain('"tone": "coral"');
+    expect(slideFile).toContain("function StructuredBlockGrid");
+    expect(slideFile).toContain("function Folio");
+    expect(slideFile).toContain("Network Readiness");
+  });
+
   it("emits edit metadata for user-authored slide fields", async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
 

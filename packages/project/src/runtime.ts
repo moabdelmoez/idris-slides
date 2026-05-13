@@ -62,6 +62,18 @@ type RenderableSlide = {
   title: string;
   content: string;
   layout: string;
+  emphasis?: DeckOutlineSlide["emphasis"];
+  visualSystem?: DeckOutlineSlide["visualSystem"];
+  blocks?: Array<NonNullable<DeckOutlineSlide["blocks"]>[number] & {
+    labelEditPath: string;
+    valueEditPath?: string;
+    detailEditPath?: string;
+  }>;
+  metrics?: Array<NonNullable<DeckOutlineSlide["metrics"]>[number] & {
+    labelEditPath: string;
+    valueEditPath?: string;
+    detailEditPath?: string;
+  }>;
   diagram?: DeckOutlineSlide["diagram"];
   titleEditPath: string;
   contentEditPath: string;
@@ -107,11 +119,33 @@ function sanitizeSlideText(value: string | undefined): string {
     .trim();
 }
 
+function sanitizeStructuredBlocks(
+  blocks: DeckOutlineSlide["blocks"] | DeckOutlineSlide["metrics"] | undefined,
+  editPath: string
+): RenderableSlide["blocks"] {
+  return blocks
+    ?.filter((block) => sanitizeSlideText(block.label))
+    .slice(0, 6)
+    .map((block, blockIndex) => ({
+      label: sanitizeSlideText(block.label),
+      value: block.value ? sanitizeSlideText(block.value) : undefined,
+      detail: block.detail ? sanitizeSlideText(block.detail) : undefined,
+      tone: block.tone,
+      labelEditPath: `${editPath}.${blockIndex}.label`,
+      valueEditPath: block.value ? `${editPath}.${blockIndex}.value` : undefined,
+      detailEditPath: block.detail ? `${editPath}.${blockIndex}.detail` : undefined
+    }));
+}
+
 function toRenderableSlides(slides: DeckOutlineSlide[]): RenderableSlide[] {
   return normalizeSlides(slides).map((slide, index) => ({
     title: sanitizeSlideText(slide.title),
     content: sanitizeSlideText(slide.content),
     layout: slide.layout,
+    emphasis: slide.emphasis,
+    visualSystem: slide.visualSystem,
+    blocks: sanitizeStructuredBlocks(slide.blocks, `slides.${index}.blocks`),
+    metrics: sanitizeStructuredBlocks(slide.metrics, `slides.${index}.metrics`),
     diagram: slide.diagram
       ? {
           ...slide.diagram,
@@ -307,12 +341,28 @@ type GeneratedDiagramSpec = {
   connections?: GeneratedDiagramConnection[];
 };
 
+type GeneratedContentTone = "coral" | "moon" | "oasis" | "purple" | "sea" | "silver" | "sunlight" | "sunset";
+
+type GeneratedStructuredBlock = {
+  label: string;
+  labelEditPath: string;
+  value?: string;
+  valueEditPath?: string;
+  detail?: string;
+  detailEditPath?: string;
+  tone?: GeneratedContentTone;
+};
+
 type GeneratedSlideSpec = {
   title: string;
   titleEditPath: string;
   content: string;
   contentEditPath: string;
   layout: string;
+  emphasis?: "balanced" | "dense" | "hero";
+  visualSystem?: "editorial" | "executive" | "technical";
+  blocks?: GeneratedStructuredBlock[];
+  metrics?: GeneratedStructuredBlock[];
   diagram?: GeneratedDiagramSpec;
 };
 
@@ -343,12 +393,114 @@ function BrandMark() {
   );
 }
 
+function toneColor(tone: GeneratedContentTone | undefined, fallback = colors.coral): string {
+  return tone ? colors[tone] : fallback;
+}
+
+function Folio({ index, variant = "light" }: { index: number; variant?: "dark" | "light" }) {
+  const color = variant === "dark" ? "rgba(255,255,255,0.62)" : colors.silver;
+
+  return (
+    <footer
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        color,
+        fontSize: 20,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        borderTop: "1px solid " + (variant === "dark" ? "rgba(255,255,255,0.18)" : "rgba(142,154,160,0.28)"),
+        paddingTop: 18
+      }}
+    >
+      <span>Solutions</span>
+      <span style={{ fontVariantNumeric: "tabular-nums" }}>{String(index + 1).padStart(2, "0")}</span>
+    </footer>
+  );
+}
+
 function contentItems(content: string, maxItems = 4): string[] {
   return content
     .split(/(?:\\n+|\\.\\s+|;\\s+)/)
     .map((item) => item.trim().replace(/[.:;]+$/, ""))
     .filter(Boolean)
     .slice(0, maxItems);
+}
+
+function fallbackBlocks(slide: GeneratedSlideSpec, maxItems = 4): GeneratedStructuredBlock[] {
+  return contentItems(slide.content, maxItems).map((item, index) => ({
+    label: index === 0 ? "Signal" : "Point " + String(index + 1).padStart(2, "0"),
+    labelEditPath: slide.contentEditPath,
+    detail: item,
+    detailEditPath: slide.contentEditPath,
+    tone: (["coral", "sunlight", "oasis", "sea"] as const)[index] ?? "coral"
+  }));
+}
+
+function slideBlocks(slide: GeneratedSlideSpec, maxItems = 4): GeneratedStructuredBlock[] {
+  const structured = [...(slide.blocks ?? []), ...(slide.metrics ?? [])].slice(0, maxItems);
+  return structured.length > 0 ? structured : fallbackBlocks(slide, maxItems);
+}
+
+function StructuredBlockGrid({
+  blocks,
+  columns = 3,
+  variant = "light"
+}: {
+  blocks: GeneratedStructuredBlock[];
+  columns?: 2 | 3 | 4;
+  variant?: "dark" | "light";
+}) {
+  const dark = variant === "dark";
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(" + columns + ", minmax(0, 1fr))", gap: 18 }}>
+      {blocks.map((block, index) => {
+        const accent = toneColor(block.tone, [colors.coral, colors.sunlight, colors.oasis, colors.sea][index] ?? colors.coral);
+        return (
+          <article
+            key={block.label + String(index)}
+            style={{
+              minHeight: 220,
+              border: "1px solid " + (dark ? "rgba(255,255,255,0.18)" : "rgba(142,154,160,0.28)"),
+              borderTop: "8px solid " + accent,
+              background: dark ? "rgba(255,255,255,0.06)" : "rgba(29,37,45,0.035)",
+              padding: "26px 24px",
+              display: "grid",
+              alignContent: "space-between",
+              boxSizing: "border-box"
+            }}
+          >
+            <p
+              data-idris-edit-path={block.labelEditPath}
+              style={{ margin: 0, color: dark ? "rgba(255,255,255,0.66)" : colors.silver, fontSize: 18, letterSpacing: "0.12em", textTransform: "uppercase" }}
+            >
+              {block.label}
+            </p>
+            <div style={{ display: "grid", gap: 12 }}>
+              {block.value ? (
+                <strong
+                  data-idris-edit-path={block.valueEditPath}
+                  style={{ color: dark ? colors.air : colors.purple, fontSize: 58, lineHeight: 0.95, fontWeight: 800 }}
+                >
+                  {block.value}
+                </strong>
+              ) : null}
+              {block.detail ? (
+                <p
+                  data-idris-edit-path={block.detailEditPath}
+                  style={{ margin: 0, color: dark ? colors.air : colors.onyx, fontSize: block.value ? 23 : 28, lineHeight: 1.18 }}
+                >
+                  {block.detail}
+                </p>
+              ) : null}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
 }
 
 function layoutKind(layout: string): "metric" | "timeline" | "comparison" | "closing" | "section" | "default" {
@@ -1044,23 +1196,31 @@ function DiagramSlide({ index, slide }: { index: number; slide: (typeof slideSpe
 function MetricPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
   const items = contentItems(slide.content, 3);
   const lead = items[0] ?? slide.content;
+  const blocks = slideBlocks(slide, 4);
 
   return (
-    <section style={{ ...shell, background: colors.air, padding: "86px 104px" }}>
+    <section style={{ ...shell, background: colors.air, padding: "76px 96px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <BrandMark />
         <span style={{ color: colors.silver, fontSize: 24 }}>{String(index + 1).padStart(2, "0")}</span>
       </header>
-      <main style={{ display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: 82, alignItems: "center" }}>
+      <main style={{ display: "grid", gridTemplateColumns: "0.86fr 1.14fr", gap: 72, alignItems: "center" }}>
         <div>
           <div style={{ width: 92, height: 12, background: colors.coral, marginBottom: 34 }} />
-          <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 78, lineHeight: 1.02, margin: 0, maxWidth: 780 }}>{slide.title}</h2>
+          <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: slide.emphasis === "hero" ? 92 : 78, lineHeight: 1.02, margin: 0, maxWidth: 820 }}>{slide.title}</h2>
+          <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.onyx, fontSize: 28, lineHeight: 1.24, margin: "34px 0 0", maxWidth: 720 }}>
+            {slide.content}
+          </p>
         </div>
         <div style={{ display: "grid", gap: 28 }}>
-          <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.purple, fontSize: 48, lineHeight: 1.08, margin: 0 }}>
-            {lead}
-          </p>
-          {items.length > 1 ? (
+          {blocks.length > 0 ? (
+            <StructuredBlockGrid blocks={blocks} columns={blocks.length >= 3 ? 3 : 2} />
+          ) : (
+            <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.purple, fontSize: 48, lineHeight: 1.08, margin: 0 }}>
+              {lead}
+            </p>
+          )}
+          {blocks.length === 0 && items.length > 1 ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
               {items.slice(1).map((item, itemIndex) => (
                 <div key={item} style={{ borderTop: "6px solid " + (itemIndex === 0 ? colors.sunlight : colors.sea), paddingTop: 18 }}>
@@ -1071,13 +1231,14 @@ function MetricPage({ index, slide }: { index: number; slide: (typeof slideSpecs
           ) : null}
         </div>
       </main>
-      <footer style={{ color: colors.silver, fontSize: 20 }}>Solutions</footer>
+      <Folio index={index} />
     </section>
   );
 }
 
 function TimelinePage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
   const items = contentItems(slide.content, 4);
+  const blocks = slideBlocks(slide, 4);
 
   return (
     <section style={{ ...shell, padding: "84px 104px" }}>
@@ -1088,22 +1249,22 @@ function TimelinePage({ index, slide }: { index: number; slide: (typeof slideSpe
       <main style={{ display: "grid", gap: 62 }}>
         <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 76, lineHeight: 1.02, margin: 0, maxWidth: 1100 }}>{slide.title}</h2>
         <ol data-idris-edit-path={slide.contentEditPath} style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 22, margin: 0, padding: 0, listStyle: "none" }}>
-          {items.map((item, itemIndex) => (
-            <li key={item} style={{ display: "grid", gap: 20, borderTop: "8px solid " + [colors.coral, colors.sunlight, colors.oasis, colors.sea][itemIndex], paddingTop: 24 }}>
+          {blocks.map((block, itemIndex) => (
+            <li key={block.label + String(itemIndex)} style={{ display: "grid", gap: 20, borderTop: "8px solid " + toneColor(block.tone, [colors.coral, colors.sunlight, colors.oasis, colors.sea][itemIndex] ?? colors.coral), paddingTop: 24 }}>
               <span style={{ color: colors.silver, fontSize: 24 }}>{String(itemIndex + 1).padStart(2, "0")}</span>
-              <span style={{ color: colors.onyx, fontSize: 26, lineHeight: 1.22 }}>{item}</span>
+              <span style={{ color: colors.onyx, fontSize: 26, lineHeight: 1.22 }}>{block.value ? block.value + " " : ""}{block.detail ?? block.label}</span>
             </li>
           ))}
         </ol>
       </main>
-      <footer style={{ color: colors.silver, fontSize: 20 }}>Solutions</footer>
+      <Folio index={index} />
     </section>
   );
 }
 
 function ComparisonPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
-  const items = contentItems(slide.content, 4);
-  const midpoint = Math.ceil(items.length / 2);
+  const blocks = slideBlocks(slide, 4);
+  const blockMidpoint = Math.ceil(blocks.length / 2);
 
   return (
     <section style={{ ...shell, padding: "86px 104px" }}>
@@ -1114,29 +1275,34 @@ function ComparisonPage({ index, slide }: { index: number; slide: (typeof slideS
       <main style={{ display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: 68, alignItems: "center" }}>
         <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 72, lineHeight: 1.04, margin: 0 }}>{slide.title}</h2>
         <div data-idris-edit-path={slide.contentEditPath} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22 }}>
-          {[items.slice(0, midpoint), items.slice(midpoint)].map((group, groupIndex) => (
+          {[blocks.slice(0, blockMidpoint), blocks.slice(blockMidpoint)].map((group, groupIndex) => (
             <div key={String(groupIndex)} style={{ background: groupIndex === 0 ? colors.purple : "rgba(29,37,45,0.04)", color: groupIndex === 0 ? colors.air : colors.onyx, padding: 38, minHeight: 320, display: "grid", alignContent: "center", gap: 20 }}>
-              {group.map((item) => (
-                <p key={item} style={{ fontSize: 25, lineHeight: 1.25, margin: 0 }}>{item}</p>
+              {group.map((block, blockIndex) => (
+                <p key={block.label + String(blockIndex)} style={{ fontSize: 25, lineHeight: 1.25, margin: 0 }}>
+                  <strong style={{ display: "block", color: groupIndex === 0 ? colors.sunlight : toneColor(block.tone), fontSize: 20, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>{block.label}</strong>
+                  {block.value ? block.value + " " : ""}{block.detail ?? ""}
+                </p>
               ))}
             </div>
           ))}
         </div>
       </main>
-      <footer style={{ color: colors.silver, fontSize: 20 }}>Solutions</footer>
+      <Folio index={index} />
     </section>
   );
 }
 
 function ClosingPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  const blocks = slideBlocks(slide, 3);
+
   return (
     <section style={{ ...shell, background: colors.purple, color: colors.air, padding: "92px 116px", justifyContent: "center", gap: 58 }}>
       <BrandMark />
       <div style={{ display: "grid", gap: 38 }}>
         <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 96, lineHeight: 0.98, margin: 0, maxWidth: 1180 }}>{slide.title}</h2>
-        <BodyList content={slide.content} editPath={slide.contentEditPath} color={colors.air} />
+        {blocks.length > 0 ? <StructuredBlockGrid blocks={blocks} columns={blocks.length >= 3 ? 3 : 2} variant="dark" /> : <BodyList content={slide.content} editPath={slide.contentEditPath} color={colors.air} />}
       </div>
-      <span style={{ color: colors.sunlight, fontSize: 24 }}>{String(index + 1).padStart(2, "0")}</span>
+      <Folio index={index} variant="dark" />
     </section>
   );
 }
@@ -1148,6 +1314,7 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
 
   const isTitleLayout = slide.layout.toLowerCase().includes("title");
   const kind = layoutKind(slide.layout);
+  const blocks = slideBlocks(slide, slide.emphasis === "dense" ? 6 : 4);
 
   if (isTitleLayout) {
     return (
@@ -1210,12 +1377,14 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
           }}
         >
           <BodyList content={slide.content} editPath={slide.contentEditPath} />
+          {blocks.length > 1 ? (
+            <div style={{ marginTop: 32 }}>
+              <StructuredBlockGrid blocks={blocks.slice(0, 4)} columns={2} />
+            </div>
+          ) : null}
         </aside>
       </main>
-      <footer style={{ display: "flex", justifyContent: "space-between", color: colors.silver, fontSize: 22 }}>
-        <span>Solutions</span>
-        <span>Generated locally by Idris Slides</span>
-      </footer>
+      <Folio index={index} />
     </section>
   );
 }

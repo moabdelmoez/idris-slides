@@ -32,6 +32,10 @@ export type DeckOutlineSlide = {
   goal: string;
   layout: string;
   visualDirection: string;
+  emphasis?: SlideEmphasis;
+  visualSystem?: SlideVisualSystem;
+  blocks?: SlideContentBlock[];
+  metrics?: SlideContentBlock[];
   diagram?: DiagramSpec;
 };
 
@@ -39,6 +43,19 @@ export type DeckOutline = {
   title: string;
   summary: string;
   slides: DeckOutlineSlide[];
+};
+
+export type SlideEmphasis = "balanced" | "dense" | "hero";
+
+export type SlideVisualSystem = "editorial" | "executive" | "technical";
+
+export type SlideContentTone = "coral" | "moon" | "oasis" | "purple" | "sea" | "silver" | "sunlight" | "sunset";
+
+export type SlideContentBlock = {
+  label: string;
+  value?: string;
+  detail?: string;
+  tone?: SlideContentTone;
 };
 
 export type DiagramType =

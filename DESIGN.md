@@ -86,6 +86,19 @@ components:
     textColor: "{colors.solutions-onyx}"
     rounded: "{rounded.none}"
     width: "min(100%, 960px)"
+  generated-slide-folio:
+    textColor: "{colors.solutions-silver}"
+    borderColor: "rgb(142 154 160 / 28%)"
+    fontSize: "20px"
+    letterSpacing: "0.08em"
+  structured-block:
+    backgroundColor: "rgb(29 37 45 / 3.5%)"
+    borderColor: "rgb(142 154 160 / 28%)"
+    accentColors:
+      - "{colors.solutions-coral}"
+      - "{colors.solutions-sunlight}"
+      - "{colors.solutions-oasis}"
+      - "{colors.solutions-sea}"
 ---
 
 # Design System: Idris Slides
@@ -105,6 +118,21 @@ The system rejects consumer creation-tool chaos, legacy ribbon-heavy office soft
 - Restrained color usage, with Solutions purple reserved for primary action, selection, and branded slide surfaces.
 - Dense but calm panels for project history, chat, settings, and export controls.
 - Familiar controls with consistent hover, focus, disabled, loading, and error states.
+
+## 1.1 Generated Deck Direction
+
+Generated slides are the highest-craft surface in the product. They should feel like authored STC/Solutions executive slides, not plain outline cards. The generator receives structured slide data and renders it through local React components, so visual richness must come from the Idris slide system rather than uncontrolled AI-authored code.
+
+Generated decks should use:
+
+- Fixed 1920 × 1080 composition with full-canvas layouts.
+- Strong display typography and restrained body copy.
+- Structured blocks for cards, timeline steps, comparison points, and technical concepts.
+- Metric blocks for measurable executive signals.
+- Native SVG/React diagrams for architecture, flow, sequence, state, ER, swimlane, quadrant, nested, tree, layers, venn, timeline, and pyramid layouts.
+- Folios, hairlines, accent bars, and brand marks to create presentation rhythm.
+
+Template samples in `templates/` are craft references only. Preserve STC/Solutions as the default identity.
 
 ## 2. Colors
 
@@ -229,6 +257,18 @@ The slide preview is the product's trust surface. It should remain visually domi
 - **Active Preview:** Purple title-slide treatment with Sunlight eyebrow and short multi-color accent bar.
 - **Empty State:** Directly states what action is needed to produce a preview.
 
+### Generated Slides
+
+Generated slides use the same brand palette but can be more expressive than the app shell. Use large titles, precise folios, structured content blocks, and full-slide spatial composition. Prefer a small number of high-impact elements over many equal cards. Use `emphasis` to tune density: `hero` for title and metric-led slides, `balanced` for most narrative slides, and `dense` for technical or multi-point slides.
+
+`visualSystem` guides tone without changing the brand:
+
+- **Executive:** clear metrics, decisive hierarchy, boardroom-ready composition.
+- **Technical:** diagram-led layouts, code/data-adjacent rhythm, sharper structure.
+- **Editorial:** explanatory pacing, section breaks, narrative slide flow.
+
+Blocks and metrics should remain editable through `data-idris-edit-path`. Do not render `goal`, `visualDirection`, or layout labels as audience-facing copy.
+
 ### Modals
 
 Modals are reserved for focused setup tasks such as settings and credentials.
@@ -244,6 +284,8 @@ Modals are reserved for focused setup tasks such as settings and credentials.
 - Do make the slide preview the dominant visual object.
 - Do keep chat restrained, direct, and structured around deck generation.
 - Do use Solutions Purple for primary action, selection, and branded slide output.
+- Do use structured slide fields to create rich layouts before considering generated code.
+- Do use folios, accent rules, structured blocks, and native diagrams in generated decks.
 - Do use structural borders and tonal layers before adding shadows.
 - Do provide visible focus, disabled, loading, empty, warning, and error states.
 - Do use lucide icons for compact repeated commands where icons are available.
@@ -255,6 +297,8 @@ Modals are reserved for focused setup tasks such as settings and credentials.
 - Don't use pastel gradients, bubbly rounded message cards, or decorative assistant motifs.
 - Don't recreate PowerPoint or Google Slides ribbon complexity.
 - Don't make Canva-like freeform drag controls the default interaction model.
+- Don't let the model generate arbitrary TSX for normal slide creation.
+- Don't copy non-STC template themes directly into generated decks.
 - Don't use colored side-stripe accents on project items, cards, callouts, or alerts.
 - Don't use gradient text.
 - Don't use glassmorphism as decorative default styling.
