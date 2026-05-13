@@ -1,16 +1,29 @@
 import type { ProjectMetadata } from "@idris-slides/project";
+import type { GenerateOutlineOptions } from "../shared/types";
 import { applyDeckOutlineEdit } from "@idris-slides/project";
 import { generateGeminiEditedOutline, generateGeminiOutline } from "./gemini";
-import { getGeminiApiKey } from "./settings-handlers";
+import { getGeminiApiKey, getTavilyApiKey } from "./settings-handlers";
+import { createResearchBrief } from "./tavily";
 
-export async function generateOutline(prompt: string) {
+export async function generateOutline(prompt: string, options: GenerateOutlineOptions = {}) {
   const apiKey = await getGeminiApiKey();
 
   if (!apiKey) {
     throw new Error("Add a Gemini API key before generating an outline.");
   }
 
-  return generateGeminiOutline(apiKey, prompt);
+  if (!options.useWebResearch) {
+    return generateGeminiOutline(apiKey, prompt);
+  }
+
+  const tavilyApiKey = await getTavilyApiKey();
+
+  if (!tavilyApiKey) {
+    throw new Error("Add a Tavily API key before using web research.");
+  }
+
+  const researchBrief = await createResearchBrief({ apiKey: tavilyApiKey, query: prompt });
+  return generateGeminiOutline(apiKey, prompt, { researchBrief });
 }
 
 export async function editDeck(project: ProjectMetadata, prompt: string) {

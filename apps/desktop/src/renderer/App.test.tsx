@@ -93,6 +93,15 @@ describe("App", () => {
         hasGeminiApiKey: true,
         workspaceRoot: "/tmp/idris-workspace"
       }),
+      saveTavilyApiKey: vi.fn().mockResolvedValue({
+        hasGeminiApiKey: true,
+        hasTavilyApiKey: true,
+        workspaceRoot: "/tmp/idris-workspace"
+      }),
+      classifyPrompt: vi.fn().mockResolvedValue({
+        mode: "deck_outline",
+        confidence: "medium"
+      }),
       generateOutline: vi.fn().mockResolvedValue({
         title: "Market Expansion",
         summary: "A branded outline for expansion planning.",
@@ -121,6 +130,42 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Add context" })).toBeInTheDocument();
     expect(screen.getByTitle("Gemini model: Gemini 2.5 Flash")).toBeInTheDocument();
     expect(screen.queryByText("Plain chat now, document import later")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Deck command").tagName).toBe("TEXTAREA");
+  });
+
+  it("asks for confirmation before using Tavily research", async () => {
+    window.idrisSlides = {
+      ...(window.idrisSlides as IdrisSlidesApi),
+      getSettings: vi.fn().mockResolvedValue({
+        hasGeminiApiKey: true,
+        hasTavilyApiKey: true,
+        workspaceRoot: "/tmp/idris-workspace"
+      }),
+      classifyPrompt: vi.fn().mockResolvedValue({
+        mode: "research_confirm",
+        confidence: "high",
+        researchRecommendation: "Use Tavily to ground current market facts."
+      })
+    };
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("Deck command"), {
+      target: { value: "Create a deck about the Saudi telecom market in 2026" }
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText(/Use Tavily to ground current market facts/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Search with Tavily" }));
+
+    expect(await screen.findByText("Market Expansion")).toBeInTheDocument();
+    expect(window.idrisSlides?.generateOutline).toHaveBeenCalledWith(
+      "Create a deck about the Saudi telecom market in 2026",
+      { useWebResearch: true }
+    );
   });
 
   it("explains when the renderer is opened without the Electron bridge", () => {

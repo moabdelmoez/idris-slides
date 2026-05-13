@@ -40,6 +40,7 @@ export function App() {
   const [settings, setSettings] = useState<AppSettings>(initialSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [tavilyApiKey, setTavilyApiKey] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
@@ -76,9 +77,33 @@ export function App() {
     }
 
     setError(null);
-    setSettings(await window.idrisSlides.saveGeminiApiKey(apiKey));
+    let nextSettings = settings;
+    if (apiKey.trim()) {
+      nextSettings = await window.idrisSlides.saveGeminiApiKey(apiKey);
+    }
+    if (tavilyApiKey.trim()) {
+      nextSettings = await window.idrisSlides.saveTavilyApiKey(tavilyApiKey);
+    }
+    setSettings(nextSettings);
     setApiKey("");
+    setTavilyApiKey("");
     setSettingsOpen(false);
+  }
+
+  async function generateOutlineForPrompt(prompt: string, useWebResearch: boolean): Promise<void> {
+    setLastPrompt(prompt);
+    const outline: DeckOutline = useWebResearch
+      ? await window.idrisSlides!.generateOutline(prompt, { useWebResearch: true })
+      : await window.idrisSlides!.generateOutline(prompt);
+    setMessages((current) => [
+      ...current,
+      {
+        id: createMessageId(),
+        role: "assistant",
+        content: useWebResearch ? "Outline ready for review with Tavily research." : "Outline ready for review.",
+        outline
+      }
+    ]);
   }
 
   async function submitPrompt(): Promise<void> {
@@ -118,18 +143,66 @@ export function App() {
           }
         ]);
       } else {
-        setLastPrompt(trimmed);
-        const outline: DeckOutline = await window.idrisSlides.generateOutline(trimmed);
-        setMessages((current) => [
-          ...current,
-          {
-            id: createMessageId(),
-            role: "assistant",
-            content: "Outline ready for review.",
-            outline
-          }
-        ]);
+        const generationMode = await window.idrisSlides.classifyPrompt(trimmed);
+
+        if (generationMode.mode === "research_confirm") {
+          setMessages((current) => [
+            ...current,
+            {
+              id: createMessageId(),
+              role: "assistant",
+              content:
+                generationMode.researchRecommendation ??
+                "This deck would benefit from current web context. Search with Tavily before drafting?",
+              researchPrompt: trimmed
+            }
+          ]);
+          return;
+        }
+
+        const requiredQuestion = generationMode.requiredQuestion;
+
+        if (generationMode.mode === "brief_needed" && requiredQuestion) {
+          setMessages((current) => [
+            ...current,
+            {
+              id: createMessageId(),
+              role: "assistant",
+              content: requiredQuestion
+            }
+          ]);
+          return;
+        }
+
+        await generateOutlineForPrompt(trimmed, false);
       }
+    } catch (caught) {
+      const detail = caught instanceof Error ? caught.message : "Unable to generate outline.";
+      setError(detail);
+      setMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "system",
+          content: detail
+        }
+      ]);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function respondToResearchPrompt(prompt: string, useWebResearch: boolean): Promise<void> {
+    if (!window.idrisSlides) {
+      setError(bridgeUnavailableMessage);
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      await generateOutlineForPrompt(prompt, useWebResearch);
     } catch (caught) {
       const detail = caught instanceof Error ? caught.message : "Unable to generate outline.";
       setError(detail);
@@ -433,6 +506,8 @@ export function App() {
               mode="dock"
               onMessageChange={setMessage}
               onApproveOutline={(outline) => void approveOutline(outline)}
+              onUseResearch={(prompt) => void respondToResearchPrompt(prompt, true)}
+              onSkipResearch={(prompt) => void respondToResearchPrompt(prompt, false)}
               onSubmit={() => void submitPrompt()}
             />
           </main>
@@ -445,6 +520,8 @@ export function App() {
             mode="intro"
             onMessageChange={setMessage}
             onApproveOutline={(outline) => void approveOutline(outline)}
+            onUseResearch={(prompt) => void respondToResearchPrompt(prompt, true)}
+            onSkipResearch={(prompt) => void respondToResearchPrompt(prompt, false)}
             onSubmit={() => void submitPrompt()}
           />
         )}
@@ -470,6 +547,19 @@ export function App() {
                 spellCheck={false}
                 type="password"
                 value={apiKey}
+              />
+            </label>
+            <label className="settingsField">
+              <span>Tavily API Key</span>
+              <input
+                autoComplete="off"
+                aria-label="Tavily API key"
+                name="tavily-api-key"
+                onChange={(event) => setTavilyApiKey(event.target.value)}
+                placeholder="tvly-..."
+                spellCheck={false}
+                type="password"
+                value={tavilyApiKey}
               />
             </label>
             <div className="settingsField">

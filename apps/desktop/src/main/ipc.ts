@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import { editDeck, generateOutline } from "./ai-handlers";
 import { exportProject } from "./export-handlers";
+import { classifyGenerationRequest } from "./generation-router";
 import {
   assertLocalProject,
   createLocalDeckFromOutline,
@@ -9,7 +10,7 @@ import {
   saveLocalDeckOutline,
   startLocalPreview
 } from "./project-handlers";
-import { chooseWorkspaceRoot, getSettings, saveGeminiApiKey } from "./settings-handlers";
+import { chooseWorkspaceRoot, getSettings, saveGeminiApiKey, saveTavilyApiKey } from "./settings-handlers";
 
 export function registerIpcHandlers(): void {
   ipcMain.handle("projects:create", async (_event, name: string) => {
@@ -48,11 +49,19 @@ export function registerIpcHandlers(): void {
     return saveGeminiApiKey(apiKey);
   });
 
+  ipcMain.handle("settings:saveTavilyApiKey", async (_event, apiKey: string) => {
+    return saveTavilyApiKey(apiKey);
+  });
+
   ipcMain.handle("settings:chooseWorkspaceRoot", async () => {
     return chooseWorkspaceRoot();
   });
 
-  ipcMain.handle("ai:generateOutline", async (_event, prompt: string) => {
-    return generateOutline(prompt);
+  ipcMain.handle("ai:classifyPrompt", async (_event, prompt: string) => {
+    return classifyGenerationRequest(prompt);
+  });
+
+  ipcMain.handle("ai:generateOutline", async (_event, prompt: string, options) => {
+    return generateOutline(prompt, options);
   });
 }

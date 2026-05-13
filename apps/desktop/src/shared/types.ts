@@ -1,6 +1,44 @@
 export type AppSettings = {
   hasGeminiApiKey: boolean;
+  hasTavilyApiKey?: boolean;
   workspaceRoot?: string;
+};
+
+export type GenerationModeName =
+  | "simple_direct"
+  | "brief_needed"
+  | "file_grounded"
+  | "research_confirm"
+  | "deck_outline"
+  | "slide_codegen";
+
+export type GenerationMode = {
+  mode: GenerationModeName;
+  confidence: "low" | "medium" | "high";
+  requiredQuestion?: string;
+  researchRecommendation?: string;
+  estimatedCostTier?: "none" | "low" | "medium" | "high";
+};
+
+export type ResearchSource = {
+  title: string;
+  url: string;
+  score?: number;
+  content?: string;
+};
+
+export type ResearchBrief = {
+  query: string;
+  answer?: string;
+  facts: string[];
+  implications: string[];
+  sources: ResearchSource[];
+  usageCredits?: number;
+  generatedAt: string;
+};
+
+export type GenerateOutlineOptions = {
+  useWebResearch?: boolean;
 };
 
 export type DeckOutlineSlide = {
@@ -70,6 +108,7 @@ export type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   outline?: DeckOutline;
+  researchPrompt?: string;
 };
 
 export type PreviewSessionInfo = {

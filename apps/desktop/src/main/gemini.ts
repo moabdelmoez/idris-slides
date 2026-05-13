@@ -1,5 +1,5 @@
 import type { ProjectMetadata } from "@idris-slides/project";
-import type { DeckOutline } from "../shared/types";
+import type { DeckOutline, ResearchBrief } from "../shared/types";
 
 type GeminiPart = {
   text?: string;
@@ -115,7 +115,32 @@ const outlineSchema = {
   required: ["title", "summary", "slides"]
 } as const;
 
-function buildOutlinePrompt(prompt: string): string {
+type GeminiOutlineOptions = {
+  researchBrief?: ResearchBrief;
+  fetchImpl?: typeof fetch;
+};
+
+function formatResearchBrief(brief: ResearchBrief): string {
+  return [
+    "Tavily research brief:",
+    `Query: ${brief.query}`,
+    brief.answer ? `Answer: ${brief.answer}` : "",
+    brief.facts.length > 0 ? `Facts:\n${brief.facts.map((fact) => `- ${fact}`).join("\n")}` : "",
+    brief.implications.length > 0
+      ? `Implications:\n${brief.implications.map((implication) => `- ${implication}`).join("\n")}`
+      : "",
+    brief.sources.length > 0
+      ? `Sources:\n${brief.sources
+          .map((source) => `- ${source.title}: ${source.url}${source.score ? ` (score ${source.score})` : ""}`)
+          .join("\n")}`
+      : "",
+    typeof brief.usageCredits === "number" ? `Tavily credits used: ${brief.usageCredits}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildOutlinePrompt(prompt: string, researchBrief?: ResearchBrief): string {
   return [
     "Create a presentation outline for a Solutions/STC branded Idris Slides deck.",
     "The slides array is the complete deck. Do not assume or add a separate title page outside the requested slide count.",
@@ -134,9 +159,15 @@ function buildOutlinePrompt(prompt: string): string {
     "Use only approved brand language and visual direction.",
     "Approved palette: air #ffffff, purple #4f008c, coral #ff375e, sunlight #ffdd40, sunset #ff6a39, oasis #00c48c, sea #1bcad8, moon #a54ee1, silver #8e9aa0, onyx #1d252d.",
     "Preferred layouts: Title slide, Section divider, Two-column slide, Metric slide, Timeline slide, Comparison slide, Image slide, Closing slide, Architecture diagram, Flowchart diagram, Sequence diagram, State diagram, ER diagram, Swimlane diagram, Quadrant diagram, Nested diagram, Tree diagram, Layer stack diagram, Venn diagram, Pyramid diagram.",
+    researchBrief
+      ? "Use the Tavily research brief as grounding for factual claims. Keep citations out of slide content unless the user explicitly asks for citations."
+      : "",
+    researchBrief ? formatResearchBrief(researchBrief) : "",
     "",
     `User prompt: ${prompt}`
-  ].join("\n");
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
 }
 
 function buildEditPrompt(project: ProjectMetadata, editPrompt: string): string {
@@ -230,8 +261,15 @@ function enforceRequestedSlideCount(outline: DeckOutline, prompt: string): DeckO
   };
 }
 
-export async function generateGeminiOutline(apiKey: string, prompt: string): Promise<DeckOutline> {
-  return enforceRequestedSlideCount(await requestGeminiOutline(apiKey, buildOutlinePrompt(prompt)), prompt);
+export async function generateGeminiOutline(
+  apiKey: string,
+  prompt: string,
+  options: GeminiOutlineOptions = {}
+): Promise<DeckOutline> {
+  return enforceRequestedSlideCount(
+    await requestGeminiOutline(apiKey, buildOutlinePrompt(prompt, options.researchBrief), options.fetchImpl),
+    prompt
+  );
 }
 
 export async function generateGeminiEditedOutline(
@@ -245,8 +283,12 @@ export async function generateGeminiEditedOutline(
   );
 }
 
-async function requestGeminiOutline(apiKey: string, prompt: string): Promise<DeckOutline> {
-  const response = await fetch(
+async function requestGeminiOutline(
+  apiKey: string,
+  prompt: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<DeckOutline> {
+  const response = await fetchImpl(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
     {
       method: "POST",

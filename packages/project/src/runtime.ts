@@ -94,10 +94,23 @@ function normalizeSlides(slides: DeckOutlineSlide[]): DeckOutlineSlide[] {
       ];
 }
 
+function sanitizeSlideText(value: string | undefined): string {
+  return (value ?? "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function toRenderableSlides(slides: DeckOutlineSlide[]): RenderableSlide[] {
   return normalizeSlides(slides).map((slide, index) => ({
-    title: slide.title,
-    content: slide.content?.trim() ?? "",
+    title: sanitizeSlideText(slide.title),
+    content: sanitizeSlideText(slide.content),
     layout: slide.layout,
     diagram: slide.diagram
       ? {
@@ -327,6 +340,63 @@ function BrandMark() {
       <span style={{ width: 54, height: 10, background: colors.oasis, display: "block" }} />
       <span style={{ width: 54, height: 10, background: colors.sea, display: "block" }} />
     </div>
+  );
+}
+
+function contentItems(content: string, maxItems = 4): string[] {
+  return content
+    .split(/(?:\\n+|\\.\\s+|;\\s+)/)
+    .map((item) => item.trim().replace(/[.:;]+$/, ""))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function layoutKind(layout: string): "metric" | "timeline" | "comparison" | "closing" | "section" | "default" {
+  const normalized = layout.toLowerCase();
+
+  if (normalized.includes("metric")) {
+    return "metric";
+  }
+
+  if (normalized.includes("timeline")) {
+    return "timeline";
+  }
+
+  if (normalized.includes("comparison")) {
+    return "comparison";
+  }
+
+  if (normalized.includes("closing")) {
+    return "closing";
+  }
+
+  if (normalized.includes("section")) {
+    return "section";
+  }
+
+  return "default";
+}
+
+function BodyList({ content, editPath, color = colors.onyx }: { content: string; editPath: string; color?: string }) {
+  const items = contentItems(content);
+
+  if (items.length <= 1) {
+    return (
+      <p data-idris-edit-path={editPath} style={{ color, fontSize: 32, lineHeight: 1.28, margin: 0, maxWidth: 900 }}>
+        {content}
+      </p>
+    );
+  }
+
+  return (
+    <ul data-idris-edit-path={editPath} style={{ display: "grid", gap: 18, margin: 0, padding: 0, listStyle: "none" }}>
+      {items.map((item, itemIndex) => (
+        <li key={item} style={{ display: "grid", gridTemplateColumns: "34px 1fr", gap: 18, alignItems: "start", color, fontSize: 28, lineHeight: 1.24 }}>
+          <span style={{ width: 12, height: 12, marginTop: 12, borderRadius: 999, background: itemIndex === 0 ? colors.coral : colors.sea }} />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -944,10 +1014,6 @@ function renderDiagram(diagram: GeneratedDiagramSpec) {
             </g>
           ))
         : null}
-      <line x1="52" y1="568" x2="948" y2="568" stroke="rgba(29,37,45,0.14)" strokeWidth="1" />
-      <text x="52" y="596" fill={colors.silver} fontFamily={fonts.body} fontSize="16">
-        {diagram.type.toUpperCase()} - Native Idris diagram
-      </text>
     </svg>
   );
 }
@@ -961,7 +1027,6 @@ function DiagramSlide({ index, slide }: { index: number; slide: (typeof slideSpe
     <section style={{ ...shell, padding: "72px 92px", gap: 34 }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <p style={{ color: colors.purple, fontSize: 24, margin: "0 0 18px" }}>{slide.layout}</p>
           <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 64, lineHeight: 1.02, margin: 0, maxWidth: 1200 }}>{slide.title}</h2>
           {slide.content ? (
             <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.onyx, fontSize: 26, lineHeight: 1.28, margin: "22px 0 0", maxWidth: 1180 }}>
@@ -976,12 +1041,113 @@ function DiagramSlide({ index, slide }: { index: number; slide: (typeof slideSpe
   );
 }
 
+function MetricPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  const items = contentItems(slide.content, 3);
+  const lead = items[0] ?? slide.content;
+
+  return (
+    <section style={{ ...shell, background: colors.air, padding: "86px 104px" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <BrandMark />
+        <span style={{ color: colors.silver, fontSize: 24 }}>{String(index + 1).padStart(2, "0")}</span>
+      </header>
+      <main style={{ display: "grid", gridTemplateColumns: "0.95fr 1.05fr", gap: 82, alignItems: "center" }}>
+        <div>
+          <div style={{ width: 92, height: 12, background: colors.coral, marginBottom: 34 }} />
+          <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 78, lineHeight: 1.02, margin: 0, maxWidth: 780 }}>{slide.title}</h2>
+        </div>
+        <div style={{ display: "grid", gap: 28 }}>
+          <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.purple, fontSize: 48, lineHeight: 1.08, margin: 0 }}>
+            {lead}
+          </p>
+          {items.length > 1 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+              {items.slice(1).map((item, itemIndex) => (
+                <div key={item} style={{ borderTop: "6px solid " + (itemIndex === 0 ? colors.sunlight : colors.sea), paddingTop: 18 }}>
+                  <p style={{ color: colors.onyx, fontSize: 25, lineHeight: 1.24, margin: 0 }}>{item}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </main>
+      <footer style={{ color: colors.silver, fontSize: 20 }}>Solutions</footer>
+    </section>
+  );
+}
+
+function TimelinePage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  const items = contentItems(slide.content, 4);
+
+  return (
+    <section style={{ ...shell, padding: "84px 104px" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <BrandMark />
+        <span style={{ color: colors.silver, fontSize: 24 }}>{String(index + 1).padStart(2, "0")}</span>
+      </header>
+      <main style={{ display: "grid", gap: 62 }}>
+        <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 76, lineHeight: 1.02, margin: 0, maxWidth: 1100 }}>{slide.title}</h2>
+        <ol data-idris-edit-path={slide.contentEditPath} style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 22, margin: 0, padding: 0, listStyle: "none" }}>
+          {items.map((item, itemIndex) => (
+            <li key={item} style={{ display: "grid", gap: 20, borderTop: "8px solid " + [colors.coral, colors.sunlight, colors.oasis, colors.sea][itemIndex], paddingTop: 24 }}>
+              <span style={{ color: colors.silver, fontSize: 24 }}>{String(itemIndex + 1).padStart(2, "0")}</span>
+              <span style={{ color: colors.onyx, fontSize: 26, lineHeight: 1.22 }}>{item}</span>
+            </li>
+          ))}
+        </ol>
+      </main>
+      <footer style={{ color: colors.silver, fontSize: 20 }}>Solutions</footer>
+    </section>
+  );
+}
+
+function ComparisonPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  const items = contentItems(slide.content, 4);
+  const midpoint = Math.ceil(items.length / 2);
+
+  return (
+    <section style={{ ...shell, padding: "86px 104px" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <BrandMark />
+        <span style={{ color: colors.silver, fontSize: 24 }}>{String(index + 1).padStart(2, "0")}</span>
+      </header>
+      <main style={{ display: "grid", gridTemplateColumns: "0.85fr 1.15fr", gap: 68, alignItems: "center" }}>
+        <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 72, lineHeight: 1.04, margin: 0 }}>{slide.title}</h2>
+        <div data-idris-edit-path={slide.contentEditPath} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22 }}>
+          {[items.slice(0, midpoint), items.slice(midpoint)].map((group, groupIndex) => (
+            <div key={String(groupIndex)} style={{ background: groupIndex === 0 ? colors.purple : "rgba(29,37,45,0.04)", color: groupIndex === 0 ? colors.air : colors.onyx, padding: 38, minHeight: 320, display: "grid", alignContent: "center", gap: 20 }}>
+              {group.map((item) => (
+                <p key={item} style={{ fontSize: 25, lineHeight: 1.25, margin: 0 }}>{item}</p>
+              ))}
+            </div>
+          ))}
+        </div>
+      </main>
+      <footer style={{ color: colors.silver, fontSize: 20 }}>Solutions</footer>
+    </section>
+  );
+}
+
+function ClosingPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
+  return (
+    <section style={{ ...shell, background: colors.purple, color: colors.air, padding: "92px 116px", justifyContent: "center", gap: 58 }}>
+      <BrandMark />
+      <div style={{ display: "grid", gap: 38 }}>
+        <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 96, lineHeight: 0.98, margin: 0, maxWidth: 1180 }}>{slide.title}</h2>
+        <BodyList content={slide.content} editPath={slide.contentEditPath} color={colors.air} />
+      </div>
+      <span style={{ color: colors.sunlight, fontSize: 24 }}>{String(index + 1).padStart(2, "0")}</span>
+    </section>
+  );
+}
+
 function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpecs)[number] }) {
   if (slide.diagram) {
     return <DiagramSlide index={index} slide={slide} />;
   }
 
   const isTitleLayout = slide.layout.toLowerCase().includes("title");
+  const kind = layoutKind(slide.layout);
 
   if (isTitleLayout) {
     return (
@@ -1006,32 +1172,44 @@ function ContentPage({ index, slide }: { index: number; slide: (typeof slideSpec
     );
   }
 
+  if (kind === "metric") {
+    return <MetricPage index={index} slide={slide} />;
+  }
+
+  if (kind === "timeline") {
+    return <TimelinePage index={index} slide={slide} />;
+  }
+
+  if (kind === "comparison") {
+    return <ComparisonPage index={index} slide={slide} />;
+  }
+
+  if (kind === "closing" || kind === "section") {
+    return <ClosingPage index={index} slide={slide} />;
+  }
+
   return (
     <section style={shell}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <BrandMark />
         <span style={{ color: colors.silver, fontSize: 26 }}>{String(index + 1).padStart(2, "0")}</span>
       </header>
-      <main style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 72, alignItems: "center" }}>
+      <main style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 78, alignItems: "center" }}>
         <div>
-          <p style={{ color: colors.purple, fontSize: 28, margin: "0 0 28px" }}>{slide.layout}</p>
+          <div style={{ width: 84, height: 10, background: colors.coral, marginBottom: 30 }} />
           <h2 data-idris-edit-path={slide.titleEditPath} style={{ fontSize: 82, lineHeight: 1.04, margin: 0 }}>{slide.title}</h2>
         </div>
         <aside
           style={{
-            background: colors.purple,
-            color: colors.air,
-            padding: "54px",
-            minHeight: 360,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            gap: 28,
+            borderTop: "10px solid " + colors.purple,
+            padding: "42px 0 0",
+            minHeight: 300,
+            display: "grid",
+            alignContent: "center",
             boxSizing: "border-box"
           }}
         >
-          <p style={{ color: colors.sunlight, fontSize: 26, margin: 0 }}>{slide.layout}</p>
-          <p data-idris-edit-path={slide.contentEditPath} style={{ color: colors.air, fontSize: 34, lineHeight: 1.28, margin: 0 }}>{slide.content}</p>
+          <BodyList content={slide.content} editPath={slide.contentEditPath} />
         </aside>
       </main>
       <footer style={{ display: "flex", justifyContent: "space-between", color: colors.silver, fontSize: 22 }}>

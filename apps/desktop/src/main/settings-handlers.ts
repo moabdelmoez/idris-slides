@@ -5,6 +5,7 @@ import type { AppSettings } from "../shared/types";
 
 type StoredSettings = {
   geminiApiKey?: string;
+  tavilyApiKey?: string;
   encrypted?: boolean;
   workspaceRoot?: string;
 };
@@ -35,33 +36,34 @@ async function writeStoredSettings(settings: StoredSettings): Promise<void> {
   await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
-function encryptSecret(secret: string): Pick<StoredSettings, "geminiApiKey" | "encrypted"> {
+function encryptSecret(secret: string): { secret: string; encrypted: boolean } {
   if (safeStorage.isEncryptionAvailable()) {
     return {
-      geminiApiKey: safeStorage.encryptString(secret).toString("base64"),
+      secret: safeStorage.encryptString(secret).toString("base64"),
       encrypted: true
     };
   }
 
-  return { geminiApiKey: secret, encrypted: false };
+  return { secret, encrypted: false };
 }
 
-function decryptSecret(settings: StoredSettings): string | null {
-  if (!settings.geminiApiKey) {
+function decryptSecret(secret: string | undefined, encrypted: boolean | undefined): string | null {
+  if (!secret) {
     return null;
   }
 
-  if (settings.encrypted) {
-    return safeStorage.decryptString(Buffer.from(settings.geminiApiKey, "base64"));
+  if (encrypted) {
+    return safeStorage.decryptString(Buffer.from(secret, "base64"));
   }
 
-  return settings.geminiApiKey;
+  return secret;
 }
 
 export async function getSettings(): Promise<AppSettings> {
   const settings = await readStoredSettings();
   return {
     hasGeminiApiKey: Boolean(settings.geminiApiKey),
+    hasTavilyApiKey: Boolean(settings.tavilyApiKey),
     workspaceRoot: settings.workspaceRoot ?? defaultWorkspaceRoot()
   };
 }
@@ -71,16 +73,53 @@ export async function saveGeminiApiKey(apiKey: string): Promise<AppSettings> {
   const current = await readStoredSettings();
 
   if (!trimmed) {
-    await writeStoredSettings({ workspaceRoot: current.workspaceRoot });
+    await writeStoredSettings({
+      tavilyApiKey: current.tavilyApiKey,
+      encrypted: current.encrypted,
+      workspaceRoot: current.workspaceRoot
+    });
     return getSettings();
   }
 
-  await writeStoredSettings({ ...current, ...encryptSecret(trimmed) });
+  const encrypted = encryptSecret(trimmed);
+  await writeStoredSettings({
+    ...current,
+    geminiApiKey: encrypted.secret,
+    encrypted: encrypted.encrypted
+  });
   return getSettings();
 }
 
 export async function getGeminiApiKey(): Promise<string | null> {
-  return decryptSecret(await readStoredSettings());
+  const settings = await readStoredSettings();
+  return decryptSecret(settings.geminiApiKey, settings.encrypted);
+}
+
+export async function saveTavilyApiKey(apiKey: string): Promise<AppSettings> {
+  const trimmed = apiKey.trim();
+  const current = await readStoredSettings();
+
+  if (!trimmed) {
+    await writeStoredSettings({
+      geminiApiKey: current.geminiApiKey,
+      encrypted: current.encrypted,
+      workspaceRoot: current.workspaceRoot
+    });
+    return getSettings();
+  }
+
+  const encrypted = encryptSecret(trimmed);
+  await writeStoredSettings({
+    ...current,
+    tavilyApiKey: encrypted.secret,
+    encrypted: encrypted.encrypted
+  });
+  return getSettings();
+}
+
+export async function getTavilyApiKey(): Promise<string | null> {
+  const settings = await readStoredSettings();
+  return decryptSecret(settings.tavilyApiKey, settings.encrypted);
 }
 
 export async function getWorkspaceRoot(): Promise<string> {

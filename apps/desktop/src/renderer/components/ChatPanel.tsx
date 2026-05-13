@@ -10,6 +10,8 @@ type ChatPanelProps = {
   mode: "intro" | "dock";
   onMessageChange(message: string): void;
   onApproveOutline(outline: DeckOutline): void;
+  onUseResearch(prompt: string): void;
+  onSkipResearch(prompt: string): void;
   onSubmit(): void;
 };
 
@@ -21,6 +23,8 @@ export function ChatPanel({
   mode,
   onMessageChange,
   onApproveOutline,
+  onUseResearch,
+  onSkipResearch,
   onSubmit
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -66,6 +70,25 @@ export function ChatPanel({
               <article className={`chatMessage ${item.role}`} key={item.id}>
                 <span className="messageRole">{item.role === "assistant" ? "Idris" : item.role}</span>
                 <p>{item.content}</p>
+                {item.researchPrompt ? (
+                  <div className="researchActions">
+                    <button
+                      className="primaryButton"
+                      disabled={isGenerating}
+                      onClick={() => onUseResearch(item.researchPrompt as string)}
+                      type="button"
+                    >
+                      Search with Tavily
+                    </button>
+                    <button
+                      disabled={isGenerating}
+                      onClick={() => onSkipResearch(item.researchPrompt as string)}
+                      type="button"
+                    >
+                      Continue without search
+                    </button>
+                  </div>
+                ) : null}
                 {item.outline ? (
                   <div className="outlineCard">
                     <div className="outlineHeader">
@@ -117,11 +140,18 @@ export function ChatPanel({
             <Plus size={18} aria-hidden="true" />
           </button>
         ) : null}
-        <input
+        <textarea
           aria-label="Deck command"
           disabled={!canSend || isGenerating}
           onChange={(event) => onMessageChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              onSubmit();
+            }
+          }}
           placeholder={mode === "intro" ? "Ask Idris to create a slide deck…" : composerPlaceholder}
+          rows={1}
           value={message}
         />
         <span className="modelChip" title="Gemini model: Gemini 2.5 Flash">

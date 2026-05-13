@@ -29,14 +29,18 @@ describe("settings handlers", () => {
     selectedWorkspace = await mkdtemp(join(tmpdir(), "idris-workspace-"));
   });
 
-  it("preserves the selected workspace when saving a Gemini key", async () => {
-    const { chooseWorkspaceRoot, getSettings, saveGeminiApiKey } = await import("./settings-handlers");
+  it("preserves the selected workspace when saving Gemini and Tavily keys", async () => {
+    const { chooseWorkspaceRoot, getSettings, saveGeminiApiKey, saveTavilyApiKey } = await import(
+      "./settings-handlers"
+    );
 
     await chooseWorkspaceRoot();
     await saveGeminiApiKey("test-key");
+    await saveTavilyApiKey("tvly-test-key");
 
     expect(await getSettings()).toEqual({
       hasGeminiApiKey: true,
+      hasTavilyApiKey: true,
       workspaceRoot: selectedWorkspace
     });
   });

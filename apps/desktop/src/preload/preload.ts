@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { ProjectMetadata } from "@idris-slides/project";
-import type { AppSettings, DeckOutline, PreviewSessionInfo } from "../shared/types";
+import type { AppSettings, DeckOutline, GenerateOutlineOptions, GenerationMode, PreviewSessionInfo } from "../shared/types";
 
 export type IdrisSlidesApi = {
   createProject(name: string): Promise<ProjectMetadata>;
@@ -13,7 +13,9 @@ export type IdrisSlidesApi = {
   getSettings(): Promise<AppSettings>;
   chooseWorkspaceRoot(): Promise<AppSettings>;
   saveGeminiApiKey(apiKey: string): Promise<AppSettings>;
-  generateOutline(prompt: string): Promise<DeckOutline>;
+  saveTavilyApiKey(apiKey: string): Promise<AppSettings>;
+  classifyPrompt(prompt: string): Promise<GenerationMode>;
+  generateOutline(prompt: string, options?: GenerateOutlineOptions): Promise<DeckOutline>;
 };
 
 const api: IdrisSlidesApi = {
@@ -47,8 +49,14 @@ const api: IdrisSlidesApi = {
   saveGeminiApiKey(apiKey) {
     return ipcRenderer.invoke("settings:saveGeminiApiKey", apiKey) as Promise<AppSettings>;
   },
-  generateOutline(prompt) {
-    return ipcRenderer.invoke("ai:generateOutline", prompt) as Promise<DeckOutline>;
+  saveTavilyApiKey(apiKey) {
+    return ipcRenderer.invoke("settings:saveTavilyApiKey", apiKey) as Promise<AppSettings>;
+  },
+  classifyPrompt(prompt) {
+    return ipcRenderer.invoke("ai:classifyPrompt", prompt) as Promise<GenerationMode>;
+  },
+  generateOutline(prompt, options) {
+    return ipcRenderer.invoke("ai:generateOutline", prompt, options) as Promise<DeckOutline>;
   }
 };
 

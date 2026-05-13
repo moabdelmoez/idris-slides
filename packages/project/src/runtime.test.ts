@@ -121,6 +121,43 @@ describe("Idris deck runtime orchestration", () => {
     expect(project.slideDirName).toBe("market-expansion");
   });
 
+  it("does not render internal layout labels as audience-facing slide copy", async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
+
+    const project = await createProjectFromOutline({
+      workspaceRoot,
+      prompt: "Create a varied executive deck",
+      outline: {
+        title: "Varied Deck",
+        summary: "A deck with layout metadata.",
+        slides: [
+          {
+            title: "Key Result",
+            content: "**Revenue:** Growth improves with focused execution. *Margin:* Protect quality.",
+            goal: "Show metric impact.",
+            layout: "Metric slide",
+            visualDirection: "Use one dominant metric."
+          },
+          {
+            title: "Next Steps",
+            content: "Align leadership. Mobilize teams. Track outcomes.",
+            goal: "Close with action.",
+            layout: "Closing slide",
+            visualDirection: "Use a clear close."
+          }
+        ]
+      }
+    });
+
+    const slideFile = await readFile(join(project.deckPath, "slides", "varied-deck", "index.tsx"), "utf8");
+
+    expect(slideFile).not.toContain("{slide.layout}");
+    expect(slideFile).not.toContain("**Revenue:**");
+    expect(slideFile).not.toContain("*Margin:*");
+    expect(slideFile).toContain("function MetricPage");
+    expect(slideFile).toContain("function ClosingPage");
+  });
+
   it("emits edit metadata for user-authored slide fields", async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), "idris-slides-"));
 
